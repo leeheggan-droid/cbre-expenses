@@ -171,4 +171,8 @@ PS.TEMPLATES = {};
 /* helper: split AUD amount 50/50 so halves sum exactly, e.g. PS.halves(34.51) -> [17.26,17.25] */
 PS.halves = (a)=>{ const c=Math.round(a*100); const x=Math.ceil(c/2), y=c-x; return [x/100, y/100]; };
 
-console.log('PS toolkit loaded. PS.audit() to inspect. See RUNBOOK.md for the procedure.');
+/* Expose globally so PS persists across separate evals (automation `javascript_tool` runs each call
+   in its own scope; `const PS` alone would not survive). DevTools console use is unaffected. */
+try { window.PS = PS; } catch (e) {}
+
+console.log('PS toolkit loaded (window.PS). PS.audit() to inspect. See RUNBOOK.md for the procedure.');
