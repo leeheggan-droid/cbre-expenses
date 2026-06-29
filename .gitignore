@@ -1,0 +1,13 @@
+# NEVER commit personal/sensitive expense data (PII: receipts, names, card numbers, passport, amounts)
+personal/
+*.zip
+*.pdf
+*.xls
+*.xlsx
+*.csv
+receipts*/
+CBRE_receipts_final*
+bali-dining-to-add.md
+
+# Only the reusable, generic tooling is tracked:
+#   README.md, RUNBOOK.md, peoplesoft-toolkit.js
