@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CBRE normalized expense line",
+  "description": "Contract passed between pipeline stages (parse -> reconcile -> classify -> preview -> orchestrator).",
+  "type": "object",
+  "required": ["id", "merchant", "amount", "currency", "source"],
+  "properties": {
+    "id": { "type": "string", "description": "stable line id, e.g. L001" },
+    "date": { "type": ["string", "null"], "description": "DD/MM/YYYY (PeopleSoft format) or null if unparseable" },
+    "merchant": { "type": "string" },
+    "description": { "type": "string" },
+    "amount": { "type": "number", "description": "positive claim amount; AUD reimburse amount for foreign lines" },
+    "currency": { "type": "string", "description": "ISO code; AUD = domestic" },
+    "source": { "type": "string", "enum": ["bank", "wallet"] },
+    "receiptMatch": {
+      "type": ["object", "null"],
+      "properties": {
+        "file": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "proposed": {
+      "type": "object",
+      "properties": {
+        "typeCode": { "type": ["string", "null"], "description": "PeopleSoft expense type code (see RUNBOOK §2)" },
+        "typeDisplay": { "type": ["string", "null"] },
+        "govtExp": { "type": "string", "enum": ["No", "Yes"], "default": "No" },
+        "isClientMeal": { "type": "boolean" },
+        "needsAttendees": { "type": "boolean" },
+        "attendees": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "company"],
+            "properties": {
+              "name": { "type": "string" },
+              "company": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        },
+        "split": { "type": "boolean", "description": "client-meal 50/50 529200/529300 split" },
+        "splitAccounts": { "type": "array", "items": { "type": "string" } },
+        "foreignCcy": { "type": ["string", "null"] }
+      }
+    },
+    "flags": { "type": "array", "items": { "type": "string" } }
+  }
+}

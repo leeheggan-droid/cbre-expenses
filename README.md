@@ -7,6 +7,27 @@ Personal details (employee ID, client contacts) live in `personal/` — gitignor
 |---|---|
 | **RUNBOOK.md** | The rules + step-by-step procedure + every field ID + gotchas. **Start here.** |
 | **peoplesoft-toolkit.js** | Pasteable `PS` JavaScript helpers (run in the page console / automation). |
+| **tools/** | Offline Python pipeline: bank statement -> normalized -> classified -> review table. |
+| **schema/** | `expenses.schema.json` — the data contract passed between pipeline stages. |
+| **samples/** | Synthetic (no-PII) example statement, roster, run-config, bank-mapping. |
+
+## Automated flow (the tool)
+
+Feed it a bank statement (primary) ± receipts (secondary) ± an attendee roster; it parses,
+classifies per the CBRE rules, shows a **GATE 1** review table, and (once you approve) drives the live
+PeopleSoft form via the Claude-in-Chrome session, stopping at **GATE 2** (Summary and Submit) for you.
+
+Offline pipeline (no PeopleSoft, safe to run anytime):
+
+```
+python tools/parse_statement.py samples/bank-sample.csv --out run/lines.json
+python tools/classify.py       run/lines.json --run-config samples/run-config.example.json \
+                               --roster personal/attendees.json --out run/classified.json
+python tools/reconcile.py      run/classified.json --receipts run/receipts.json --out run/reconciled.json
+python tools/preview.py        run/classified.json --out run/approved.json   # GATE 1 table
+```
+
+Real inputs (bank exports, receipts, your roster) go under gitignored `personal/`. Tests: `python tests/test_cbre_lib.py`.
 
 ## The short version
 
