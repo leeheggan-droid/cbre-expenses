@@ -1,0 +1,7 @@
+{
+  "_comment": "EXAMPLE roster with fake names. Real attendees are PII -> keep them in gitignored personal/attendees.json, NOT here. One key per client; each value is the attendee rows for that client's meal modal.",
+  "AcmeCorp": [
+    { "name": "Smith,John", "company": "AcmeCorp", "title": "Director" },
+    { "name": "Doe,Jane", "company": "AcmeCorp", "title": "VP" }
+  ]
+}

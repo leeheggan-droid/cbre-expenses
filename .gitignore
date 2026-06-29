@@ -9,5 +9,14 @@ receipts*/
 CBRE_receipts_final*
 bali-dining-to-add.md
 
+# Python + pipeline run artifacts
+__pycache__/
+*.pyc
+/run/
+personal/runs/
+
+# Synthetic, no-PII sample data IS tracked (override the *.csv rule above):
+!samples/*.csv
+
 # Only the reusable, generic tooling is tracked:
-#   README.md, RUNBOOK.md, peoplesoft-toolkit.js
+#   README.md, RUNBOOK.md, peoplesoft-toolkit.js, tools/, schema/, samples/, tests/

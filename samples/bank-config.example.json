@@ -1,0 +1,10 @@
+{
+  "_comment": "Optional per-bank column mapping for parse_statement.py --config. Only needed if auto-detection misses a column. Keys are our canonical fields; values are the EXACT header text in your statement.",
+  "bank": "Example Bank",
+  "columns": {
+    "date": "Transaction Date",
+    "description": "Narrative",
+    "amount": "Amount",
+    "currency": "Currency"
+  }
+}

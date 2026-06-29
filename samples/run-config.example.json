@@ -1,0 +1,7 @@
+{
+  "_comment": "Per-report settings. Copy to personal/runs/<run>/run-config.json and edit. clientKey must match a key in your roster (personal/attendees.json).",
+  "clientKey": "AcmeCorp",
+  "defaultLocation": "363 George St-SYD",
+  "businessPurpose": "Client-Business Meeting",
+  "reportDescription": "Sample client trip"
+}
