@@ -132,6 +132,7 @@ class Line:
     fxFee: float = 0.0                   # overseas FX fee folded into amount (for reference)
     foreignOrigin: Optional[str] = None  # origin currency code if charged overseas (still billed AUD)
     claimGuess: Optional[str] = None     # triage: "business" | "personal" | "uncertain"
+    rtype: Optional[str] = None          # receipt-stated type (meal/drinks/taxi/...) - authoritative if set
     receiptMatch: Optional[dict] = None  # {file, confidence} | None
     proposed: Proposed = field(default_factory=Proposed)
     flags: list = field(default_factory=list)
@@ -188,8 +189,15 @@ def build_proposed(line: Line, has_client_roster: bool, roster: Optional[dict],
                    client_key: Optional[str]) -> Proposed:
     """Fill a line's `proposed` block from the heuristics + CBRE rules."""
     is_foreign = (line.currency or DOMESTIC_CCY).upper() != DOMESTIC_CCY
-    code, flags = classify_merchant(line.merchant, line.description, is_foreign, has_client_roster)
-    line.flags.extend(flags)
+    rtype = (getattr(line, "rtype", None) or "").lower()
+    if rtype in ("meal", "drinks", "meal+drinks"):
+        # The receipt itself says this is a meal/drinks - trust it over the merchant name
+        # (e.g. an Aussie "... Hotel" that's actually a pub would otherwise look like accommodation).
+        code = ("MEALINC" if is_foreign else "MEALCLI") if has_client_roster else ("MEALINT" if is_foreign else "SUBSIST")
+        line.flags.append("receipt meal/drinks - confirm attendees" + (" + 50/50 split" if has_client_roster else ""))
+    else:
+        code, flags = classify_merchant(line.merchant, line.description, is_foreign, has_client_roster)
+        line.flags.extend(flags)
 
     p = Proposed(
         typeCode=code,
@@ -291,10 +299,30 @@ def triage(lines, extra_personal=None, extra_business=None) -> list[tuple]:
 
 
 # --------------------------------------------------------------------------- #
+# FX: approximate conversion to AUD for preview/estimate ONLY. PeopleSoft converts
+# foreign lines at the corporate rate at entry (RUNBOOK 6) - these are just so the
+# GATE-1 review can show a single AUD-ish total. Override via personal/fx-rates.json.
+# Value = AUD per 1 unit of the currency.
+# --------------------------------------------------------------------------- #
+FX_TO_AUD = {
+    "AUD": 1.0, "USD": 1.52, "GBP": 1.95, "EUR": 1.64, "NZD": 0.92,
+    "HKD": 0.195, "MYR": 0.34, "IDR": 0.000098, "SGD": 1.14, "THB": 0.044,
+    "JPY": 0.0099, "VND": 0.00006, "PHP": 0.027, "INR": 0.018, "AED": 0.41, "CNY": 0.21,
+}
+
+
+def to_aud(amount: float, currency: str, rates: Optional[dict] = None) -> Optional[float]:
+    """Approximate AUD value of amount in currency, or None if the rate is unknown."""
+    r = (rates or FX_TO_AUD).get((currency or "AUD").upper())
+    return round(amount * r, 2) if r is not None else None
+
+
+# --------------------------------------------------------------------------- #
 # Small IO helpers
 # --------------------------------------------------------------------------- #
 def load_json(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as fh:
+    # utf-8-sig tolerates a BOM (common on Windows-authored JSON) and plain UTF-8 alike.
+    with open(path, "r", encoding="utf-8-sig") as fh:
         return json.load(fh)
 
 

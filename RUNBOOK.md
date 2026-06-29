@@ -3,6 +3,16 @@
 How to create/fill an expense report in CBRE's PeopleSoft (myhcm.cbre.com) **fast and correctly**.
 Employee ID and entry point: see `personal/my-details.md`.
 
+> **Automated tool / pipeline.** Everything below is the manual reference. The faster path is the
+> `cbre-expense-autofill` skill (`.claude/skills/cbre-expense-autofill/SKILL.md`), which runs an
+> offline Python pipeline and then drives this form for you - using exactly the rules and field IDs in
+> this runbook. The pipeline (in `tools/`) is: `parse_statement.py` (statement -> normalized lines)
+> -> `reconcile.py` (receipts + My-Wallet) -> `classify.py` (triage + propose type/attendees/split)
+> -> `preview.py` (the GATE 1 review table you approve). It is offline and safe to run anytime; see
+> `README.md` for example commands and `docs/USAGE.md` for a walk-through. The skill stops at
+> **Summary and Submit** (GATE 2) - it never submits. The sections below remain the source of truth
+> for the business rules and the form's behaviour, whether you enter by hand or check the tool's work.
+
 ---
 
 ## 0. TL;DR — the "better way" that actually works

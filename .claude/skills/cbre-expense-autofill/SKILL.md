@@ -33,31 +33,51 @@ PeopleSoft expense report. Read `RUNBOOK.md` for the underlying rules and field 
 ## Stage 0 — Gather inputs
 Ask the user for / locate:
 1. **Bank statement** (CSV or PDF) — primary. Put under `personal/runs/<run>/`.
-2. **Receipts** (images/PDFs) — optional secondary. (Receipt parsing = the Phase D `parse_receipts.py`.)
+2. **Receipts** (images/PDFs) — optional secondary. Extract them with **Claude-native vision**: open
+   each image with the Read tool and write the data to `personal/runs/<run>/receipts.json` as a list
+   under a `receipts` key — `[{file, merchant, date "DD/MM/YYYY", currency, total, type, items[], pay, note}]`
+   (type ∈ meal/drinks/taxi/hotel/…). No external API key. receipts not on the statement are still
+   claimed (reconcile promotes them to lines).
 3. **Roster** `personal/attendees.json` and a **run-config** (`clientKey`, `defaultLocation`,
-   `businessPurpose`, `reportDescription`). Copy `samples/run-config.example.json` as a starting point.
+   `businessPurpose`, `reportDescription`). Copy `samples/run-config.example.json`. Per-user recurring
+   merchants go in `personal/triage.json` (copy `samples/triage.example.json`).
 
 If a bank profile is needed (auto-detect misses columns), create one from `samples/bank-config.example.json`.
 
 ## Stage 1 — Offline pipeline (no PeopleSoft; safe to run anytime)
-Run, substituting the run dir:
+**One-shot (preferred):**
 ```
-$PY tools/parse_statement.py personal/runs/<run>/statement.csv --out personal/runs/<run>/lines.json
-$PY tools/reconcile.py       personal/runs/<run>/lines.json \
-        --receipts personal/runs/<run>/receipts.json --wallet personal/runs/<run>/wallet.json \
-        --out personal/runs/<run>/reconciled.json        # omit --receipts/--wallet if none yet
-$PY tools/classify.py        personal/runs/<run>/lines.json \
-        --run-config personal/runs/<run>/run-config.json --roster personal/attendees.json \
-        --out personal/runs/<run>/classified.json
-$PY tools/preview.py         personal/runs/<run>/classified.json --out personal/runs/<run>/approved.json
+$PY tools/run_pipeline.py --statement personal/runs/<run>/statement.pdf \
+    --run-config personal/runs/<run>/run-config.json --roster personal/attendees.json \
+    --triage personal/triage.json --receipts personal/runs/<run>/receipts.json \
+    --outdir personal/runs/<run>
 ```
-(If you ran reconcile, feed `reconciled.json` into classify instead of `lines.json`.)
+This runs parse → reconcile → classify → preview and writes lines/reconciled/classified/approved.json.
+(Or run the stages individually: `parse_statement.py` → `reconcile.py` → `classify.py` → `preview.py`.)
+
+**Easy mode (operator prefers Excel):** instead of editing JSON, generate a spreadsheet with dropdowns,
+have the operator fill it, and read it back:
+```
+$PY tools/excel_template.py personal/runs/<run>/classified.json --out personal/runs/<run>/review.xlsx
+# ... operator fills review.xlsx (Claim, ExpenseType, Attendees, Split5050) ...
+$PY tools/excel_read.py     personal/runs/<run>/review.xlsx --out personal/runs/<run>/approved.json
+```
 
 ## GATE 1 — Pre-entry review (REQUIRED)
 Show the user the `preview.py` table. Walk through every **FLAG** (unknown types, accommodation→CTM,
-meals needing attendee/split confirmation, unparseable dates, wallet duplicates). Let the user edit
-`approved.json` (or tell you corrections). **Get explicit approval before Stage 2.** The approved
-`lines[]` (each with `proposed`) is what you enter.
+meals needing attendees/split, unparseable dates, wallet duplicates, receipt-only lines, uncertain
+triage). Let the user move lines between business/personal and fix types.
+
+**Attendee interview (for every meal/drink):** list the meals that need attendees and ask the operator,
+per line: how many people, how many CBRE, how many client, and names in `Surname,First` with each
+person's org. Then apply:
+```
+$PY tools/attendees.py list  personal/runs/<run>/classified.json
+$PY tools/attendees.py apply personal/runs/<run>/classified.json --answers answers.json --out personal/runs/<run>/approved.json
+```
+Anyone whose org ≠ CBRE makes it a client meal → attendees + 50/50 split set automatically.
+
+**Get explicit approval before Stage 2.** The approved `lines[]` (each with `proposed`) is what you enter.
 
 ---
 
@@ -116,7 +136,7 @@ Submit** themselves.
 
 ## Receipts (manual — extension not authorised on myfin.cbre.com)
 The Chrome extension is authorised on `myhcm` but **not** `myfin` (where the receipt file-input lives,
-in nested iframes). So: prepare the receipt **bundle** (Phase D `parse_receipts.py`: shrink image-PDFs,
+in nested iframes). So: prepare the receipt **bundle** (`tools/receipt_bundle.py`: shrink image-PDFs,
 one image per claim, named to the claim), then instruct the user to download + attach manually. Verify
 **#receipts == #lines** before the user submits.
 

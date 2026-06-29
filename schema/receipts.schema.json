@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CBRE receipt object",
+  "description": "A single receipt extracted (via vision) to supplement a bank line. Mirrors personal/runs/*/receipts.json; see RUNBOOK.md section 6 for how receipts are bundled and attached one image per claim line.",
+  "type": "object",
+  "required": ["file", "merchant", "currency"],
+  "properties": {
+    "file": { "type": "string", "description": "receipt filename (image or PDF) relative to the receipts dir" },
+    "merchant": { "type": "string" },
+    "date": { "type": ["string", "null"], "description": "DD/MM/YYYY or null if unparseable" },
+    "currency": { "type": "string", "description": "ISO code in the receipt's original currency; AUD = domestic" },
+    "total": { "type": ["number", "null"], "description": "receipt total in the original currency, or null if not legible" },
+    "type": {
+      "type": "string",
+      "description": "rough category of the receipt",
+      "enum": ["meal", "drinks", "taxi", "hotel", "accommodation", "other"]
+    },
+    "items": { "type": "array", "items": { "type": "string" }, "description": "line items as printed on the receipt" },
+    "pay": { "type": "string", "description": "payment method / card noted on the receipt" },
+    "note": { "type": "string", "description": "free-text observation (e.g. duplicate, personal, needs re-read)" },
+    "claimable": { "type": "boolean", "description": "true if this receipt belongs on the CBRE claim (false = personal/duplicate)" }
+  }
+}
