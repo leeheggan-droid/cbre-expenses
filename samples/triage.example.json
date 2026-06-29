@@ -1,0 +1,5 @@
+{
+  "_comment": "Per-user triage overrides, merged into the generic rules in cbre_lib. Copy to personal/triage.json (gitignored) and add YOUR recurring local merchants so the public repo never holds your spending fingerprint. personalMerchants -> always treated as personal (excluded). businessMerchants -> treated as business travel even without a foreign currency (e.g. client sites).",
+  "personalMerchants": ["my local bakery", "my butcher", "my gym", "my pharmacy"],
+  "businessMerchants": ["client site or data centre name"]
+}

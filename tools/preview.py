@@ -24,52 +24,73 @@ def _clip(s: str, n: int) -> str:
     return s if len(s) <= n else s[: n - 1] + "~"
 
 
+def _row(ln: dict) -> str:
+    p = ln.get("proposed", {})
+    att = str(len(p.get("attendees", []))) if p.get("needsAttendees") else "-"
+    split = "50/50" if p.get("split") else "-"
+    rcpt = "Y" if ln.get("receiptMatch") else "-"
+    return (
+        f"{ln['id']:<5}{(ln.get('date') or '??'):<12}{_clip(ln.get('merchant',''),27):<28}"
+        f"{ln.get('amount',0):>10,.2f} {(p.get('typeCode') or '-'):<9}{att:<4}{split:<6}{rcpt:<5}"
+    )
+
+
 def render(data: dict) -> str:
     lines = data["lines"]
     rc = data.get("runConfig", {})
-    out: list[str] = []
-    out.append("=" * 100)
-    out.append("GATE 1 - PRE-ENTRY REVIEW   (nothing is entered into PeopleSoft until you approve)")
-    out.append("=" * 100)
-    if rc:
-        out.append(f"Client: {rc.get('clientKey','-')}   Default Location: {rc.get('defaultLocation','-')}   "
-                   f"Purpose: {rc.get('businessPurpose','-')}")
-        out.append(f"Report: {rc.get('reportDescription','-')}")
-        out.append("-" * 100)
-
-    hdr = f"{'#':<5}{'DATE':<12}{'MERCHANT':<26}{'AMOUNT':>12} {'CCY':<5}{'TYPE':<9}{'ATT':<4}{'SPLIT':<6}{'RCPT':<5}"
-    out.append(hdr)
-    out.append("-" * 100)
+    groups = {"business": [], "uncertain": [], "personal": []}
     for ln in lines:
-        p = ln.get("proposed", {})
-        att = str(len(p.get("attendees", []))) if p.get("needsAttendees") else "-"
-        split = "50/50" if p.get("split") else "-"
-        rcpt = "Y" if ln.get("receiptMatch") else "-"
-        out.append(
-            f"{ln['id']:<5}{(ln.get('date') or '??'):<12}{_clip(ln.get('merchant',''),25):<26}"
-            f"{ln.get('amount',0):>12,.2f} {(ln.get('currency') or ''):<5}"
-            f"{(p.get('typeCode') or '?'):<9}{att:<4}{split:<6}{rcpt:<5}"
-        )
+        groups.get(ln.get("claimGuess") or "uncertain", groups["uncertain"]).append(ln)
 
-    # flags block
-    flagged = [(ln["id"], ln["flags"]) for ln in lines if ln.get("flags")]
+    out: list[str] = []
+    out.append("=" * 96)
+    out.append("GATE 1 - PRE-ENTRY REVIEW   (confirm personal vs business; nothing is entered until you approve)")
+    out.append("=" * 96)
+    if data.get("tripWindows"):
+        out.append("Detected trip windows: " + ", ".join(f"{a}..{b}" for a, b in data["tripWindows"]))
+    if rc:
+        out.append(f"Client: {rc.get('clientKey','-')}   Location: {rc.get('defaultLocation','-')}   "
+                   f"Purpose: {rc.get('businessPurpose','-')}")
+    hdr = f"{'#':<5}{'DATE':<12}{'MERCHANT':<28}{'AMOUNT':>10} {'TYPE':<9}{'ATT':<4}{'SPLIT':<6}{'RCPT':<5}"
+
+    for key, title in [("business", "BUSINESS - proposed to CLAIM"),
+                       ("uncertain", "UNCERTAIN - please decide (claim or drop?)"),
+                       ("personal", "PERSONAL - excluded (not claimed)")]:
+        g = groups[key]
+        sub = round(sum(x.get("amount", 0) for x in g), 2)
+        out.append("")
+        out.append(f"--- {title}   [{len(g)} lines, AUD {sub:,.2f}] " + "-" * 20)
+        if not g:
+            out.append("  (none)")
+            continue
+        if key == "personal":
+            for ln in g:   # compact: personal items don't need the full grid
+                out.append(f"  {ln['id']} {(ln.get('date') or '??'):<11}{_clip(ln.get('merchant',''),34):<35}{ln.get('amount',0):>9,.2f}")
+            continue
+        out.append(hdr)
+        for ln in g:
+            out.append(_row(ln))
+
+    # flags for claimable lines
+    flagged = [(ln["id"], ln["flags"]) for ln in lines
+               if ln.get("flags") and (ln.get("claimGuess") != "personal")]
     if flagged:
-        out.append("-" * 100)
-        out.append("FLAGS (review these):")
+        out.append("")
+        out.append("FLAGS (claimable lines):")
         for lid, fl in flagged:
             for f in fl:
                 out.append(f"  {lid}: {f}")
 
     s = data.get("summary", {})
-    totals = s.get("totalByCurrency") or {}
-    totals_str = "  ".join(f"{ccy} {amt:,.2f}" for ccy, amt in totals.items()) or "n/a"
-    out.append("=" * 100)
-    out.append(f"TOTALS: {totals_str}   Lines: {s.get('lineCount', len(lines))}   "
-               f"Foreign: {s.get('foreignLines', 0)}   Flagged: {s.get('flaggedLines', len(flagged))}")
+    t = s.get("totalsAUD", {})
+    out.append("=" * 96)
+    out.append(f"CLAIMABLE (business+uncertain): AUD {s.get('claimTotalAUD', 0):,.2f}   "
+               f"[business {t.get('business',0):,.2f} | uncertain {t.get('uncertain',0):,.2f} | "
+               f"personal excluded {t.get('personal',0):,.2f}]")
     out.append(f"by type: {s.get('byType', {})}")
-    out.append("Foreign lines convert to AUD in PeopleSoft at entry (RUNBOOK 6) - totals shown per currency.")
-    out.append("Govt Exp = No on every line (CBRE rule). Tool STOPS at Summary-and-Submit - you submit.")
-    out.append("=" * 100)
+    out.append("Confirm the UNCERTAIN lines and any flagged meals (attendees + 50/50 split) before approval.")
+    out.append("Govt Exp = No on every line. Tool STOPS at Summary-and-Submit - you submit.")
+    out.append("=" * 96)
     return "\n".join(out)
 
 
