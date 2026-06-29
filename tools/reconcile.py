@@ -87,9 +87,37 @@ def reconcile(lines: list[dict], receipts: list[dict], wallet: list[dict]) -> di
                 f"matches a My-Wallet item ({ws}) — already in PeopleSoft; do NOT re-add as out-of-pocket")
 
     orphan_receipts = [receipts[i] for i in range(len(receipts)) if i not in used_receipts]
+    # Promote orphan receipts (not on the statement) to claimable candidate lines, so receipt-only
+    # expenses (e.g. a client dinner paid in cash) still get into the claim. Skip card-payment slips
+    # and receipts with no readable total. Triage/classify + GATE 1 then decide business vs personal.
+    receipt_lines = []
+    k = 0
+    for r in orphan_receipts:
+        if not r.get("total") or (r.get("type") or "").lower() in ("card-slip", "card slip"):
+            continue
+        k += 1
+        receipt_lines.append({
+            "id": f"R{k:03d}",
+            "date": r.get("date"),
+            "merchant": r.get("merchant", ""),
+            "description": r.get("merchant", ""),
+            "amount": r.get("total") or 0,
+            "currency": (r.get("currency") or "AUD"),
+            "source": "receipt",
+            "fxFee": 0.0,
+            "foreignOrigin": (r.get("currency") if (r.get("currency") or "AUD").upper() != "AUD" else None),
+            "claimGuess": None,
+            "rtype": r.get("type"),
+
+            "receiptMatch": {"file": r.get("file"), "confidence": 1.0},
+            "proposed": {},
+            "flags": [f"receipt-only (not on statement): {r.get('file')}"]
+                     + ([r["note"]] if r.get("note") else []),
+        })
     return {
-        "lines": lines,
-        "orphanReceipts": orphan_receipts,        # receipts with no bank line — surfaced, not claimed
+        "lines": lines + receipt_lines,
+        "orphanReceiptsPromoted": len(receipt_lines),
+        "orphanReceiptsSkipped": len(orphan_receipts) - len(receipt_lines),
         "walletNotOnStatement": [wallet[j] for j in wallet_unmatched],
     }
 
@@ -110,8 +138,8 @@ def main() -> None:
 
     result = reconcile(lines, receipts, wallet)
     matched = sum(1 for ln in result["lines"] if ln.get("receiptMatch"))
-    print(f"{len(result['lines'])} lines | {matched} receipt-matched | "
-          f"{len(result['orphanReceipts'])} orphan receipts | "
+    print(f"{len(result['lines'])} lines ({result['orphanReceiptsPromoted']} promoted from receipt-only, "
+          f"{result['orphanReceiptsSkipped']} receipts skipped) | {matched} receipt-matched | "
           f"{len(result['walletNotOnStatement'])} wallet items not on statement", file=sys.stderr)
     if args.out:
         dump_json(result, args.out)

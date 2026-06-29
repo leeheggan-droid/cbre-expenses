@@ -19,7 +19,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cbre_lib import Line, build_proposed, dump_json, load_json, triage  # noqa: E402
+from cbre_lib import Line, build_proposed, dump_json, load_json, to_aud, triage  # noqa: E402
 
 
 def _line_from_dict(d: dict) -> Line:
@@ -28,7 +28,7 @@ def _line_from_dict(d: dict) -> Line:
         description=d.get("description", ""), amount=d.get("amount", 0.0),
         currency=d.get("currency", "AUD"), source=d.get("source", "bank"),
         fxFee=d.get("fxFee", 0.0), foreignOrigin=d.get("foreignOrigin"),
-        claimGuess=d.get("claimGuess"),
+        claimGuess=d.get("claimGuess"), rtype=d.get("rtype"),
         receiptMatch=d.get("receiptMatch"), flags=list(d.get("flags", [])),
     )
     return ln
@@ -64,11 +64,15 @@ def summarize(lines: list[Line]) -> dict:
         counts[k] = counts.get(k, 0) + 1
         if k != "personal" and ln.proposed.typeCode:
             by_type[ln.proposed.typeCode] = by_type.get(ln.proposed.typeCode, 0) + 1
+    # AUD estimate across claimable lines (foreign converted approximately; PeopleSoft does the real rate)
+    claim_est_aud = round(sum(to_aud(ln.amount, ln.currency) or 0.0
+                              for ln in lines if ln.claimGuess != "personal"), 2)
     return {
         "lineCount": len(lines),
         "counts": counts,
         "totalsAUD": totals,
         "claimTotalAUD": round(totals["business"] + totals["uncertain"], 2),
+        "claimEstAUD": claim_est_aud,
         "byType": by_type,
         "flaggedLines": sum(1 for ln in lines if ln.flags and ln.claimGuess != "personal"),
     }
@@ -84,6 +88,8 @@ def main() -> None:
     args = ap.parse_args()
 
     raw = load_json(args.lines)
+    if isinstance(raw, dict):           # accept reconcile.py output ({"lines": [...]}) or a bare list
+        raw = raw.get("lines", [])
     lines = [_line_from_dict(d) for d in raw]
     run_config = load_json(args.run_config)
     roster = load_json(args.roster) if args.roster and os.path.exists(args.roster) else None

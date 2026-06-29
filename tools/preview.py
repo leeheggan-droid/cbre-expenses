@@ -84,9 +84,12 @@ def render(data: dict) -> str:
     s = data.get("summary", {})
     t = s.get("totalsAUD", {})
     out.append("=" * 96)
-    out.append(f"CLAIMABLE (business+uncertain): AUD {s.get('claimTotalAUD', 0):,.2f}   "
-               f"[business {t.get('business',0):,.2f} | uncertain {t.get('uncertain',0):,.2f} | "
-               f"personal excluded {t.get('personal',0):,.2f}]")
+    est = s.get("claimEstAUD")
+    est_str = f"  (~AUD {est:,.2f} incl. foreign converted)" if est is not None else ""
+    out.append(f"CLAIMABLE (business+uncertain){est_str}   "
+               f"counts: business {(s.get('counts') or {}).get('business',0)} | "
+               f"uncertain {(s.get('counts') or {}).get('uncertain',0)} | "
+               f"personal excluded {(s.get('counts') or {}).get('personal',0)}")
     out.append(f"by type: {s.get('byType', {})}")
     out.append("Confirm the UNCERTAIN lines and any flagged meals (attendees + 50/50 split) before approval.")
     out.append("Govt Exp = No on every line. Tool STOPS at Summary-and-Submit - you submit.")
