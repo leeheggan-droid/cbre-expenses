@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 # --------------------------------------------------------------------------- #
@@ -126,9 +126,12 @@ class Line:
     date: Optional[str]                  # DD/MM/YYYY
     merchant: str
     description: str
-    amount: float
+    amount: float                        # AUD charged (incl. any folded-in FX fee)
     currency: str = DOMESTIC_CCY
     source: str = "bank"                 # "bank" | "wallet"
+    fxFee: float = 0.0                   # overseas FX fee folded into amount (for reference)
+    foreignOrigin: Optional[str] = None  # origin currency code if charged overseas (still billed AUD)
+    claimGuess: Optional[str] = None     # triage: "business" | "personal" | "uncertain"
     receiptMatch: Optional[dict] = None  # {file, confidence} | None
     proposed: Proposed = field(default_factory=Proposed)
     flags: list = field(default_factory=list)
@@ -204,6 +207,87 @@ def build_proposed(line: Line, has_client_roster: bool, roster: Optional[dict],
         p.split = True
         p.splitAccounts = [ACCT_EMPLOYEE, ACCT_CLIENT]
     return p
+
+
+# --------------------------------------------------------------------------- #
+# Triage: business vs personal. Foreign-trip date windows are the strong signal;
+# merchant heuristics do the rest. The user CONFIRMS the split at GATE 1.
+# --------------------------------------------------------------------------- #
+# Currencies that signal overseas travel. USD/EUR/GBP excluded on purpose (mostly SaaS, not trips).
+TRAVEL_CCYS = {"MYR", "HKD", "SGD", "THB", "IDR", "JPY", "VND", "PHP", "KRW", "TWD", "CNY", "INR", "AED"}
+
+# Generic, globally-recognisable personal merchants only. User-specific local merchants (your
+# bakery, butcher, gym, etc.) are PII-ish and belong in gitignored personal/triage.json, merged
+# in at runtime via triage(extra_personal=...). Keep this list non-identifying.
+PERSONAL_RE = re.compile(
+    r"netflix|\bstan\b|prime\s*vide|primevideo|disney|spotify|apple\.com/bill|google\s*tv|paramount|youtube|"
+    r"coles|woolworth|woolies|aldi|\biga\b|tesco|sainsbury|waitrose|co-?op|m&s|marks\s*&\s*spencer|"
+    r"pharmacy|chemist|"
+    r"openai|anthropic|claude\.ai|github|google\*?cloud|\baws\b|digitalocean|elevenlabs|hostinger|"
+    r"\bamazon\b|sephora|\bsteam\b|steamgames|"
+    r"\bbutcher\b|bakehouse|\bbakery\b",
+    re.I,
+)
+# Merchants that signal business travel even without a travel currency. Extend per-user via
+# triage(extra_business=...) from personal/triage.json.
+TRAVEL_MERCHANT_RE = re.compile(
+    r"hotel|hyatt|marriott|indigo|hilton|accor|ibis|sheraton|westin|resort|"
+    r"\bgrab\b|uber(?!direct|\s*one)|taxi|\bcab\b|klia|eraman|airport|lounge|airline|airasia|qantas|cathay",
+    re.I,
+)
+
+
+def _merge_re(base: re.Pattern, extra: Optional[list]) -> re.Pattern:
+    if not extra:
+        return base
+    return re.compile("|".join([base.pattern] + [re.escape(str(t)) for t in extra]), re.I)
+
+
+def _to_dt(s):
+    try:
+        return datetime.strptime(s, "%d/%m/%Y") if s else None
+    except (ValueError, TypeError):
+        return None
+
+
+def trip_windows(lines, gap_days: int = 5, buffer_days: int = 1):
+    """Cluster dates of travel-currency transactions into trip windows [(start, end), ...]."""
+    dates = sorted({_to_dt(l.date) for l in lines
+                    if (l.foreignOrigin or "").upper() in TRAVEL_CCYS and _to_dt(l.date)})
+    windows: list[list] = []
+    for d in dates:
+        if windows and (d - windows[-1][1]).days <= gap_days:
+            windows[-1][1] = d
+        else:
+            windows.append([d, d])
+    return [(s - timedelta(days=buffer_days), e + timedelta(days=buffer_days)) for s, e in windows]
+
+
+def triage(lines, extra_personal=None, extra_business=None) -> list[tuple]:
+    """Label each line's claimGuess in {business, personal, uncertain}. Returns trip windows.
+
+    extra_personal / extra_business: per-user merchant terms (from gitignored personal/triage.json)
+    merged into the generic patterns, so user-specific local merchants never live in the repo.
+    """
+    windows = trip_windows(lines)
+    personal_re = _merge_re(PERSONAL_RE, extra_personal)
+    travel_re = _merge_re(TRAVEL_MERCHANT_RE, extra_business)
+
+    def in_window(dt) -> bool:
+        return dt is not None and any(s <= dt <= e for s, e in windows)
+
+    for l in lines:
+        ccy = (l.foreignOrigin or "").upper()
+        if personal_re.search(l.merchant or ""):
+            l.claimGuess = "personal"
+        elif ccy in TRAVEL_CCYS or travel_re.search(l.merchant or ""):
+            l.claimGuess = "business"
+        elif in_window(_to_dt(l.date)):
+            l.claimGuess = "business"
+            l.flags.append("in trip window - confirm business")
+        else:
+            l.claimGuess = "uncertain"
+    return windows
 
 
 # --------------------------------------------------------------------------- #
