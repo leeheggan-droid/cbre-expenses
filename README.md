@@ -101,6 +101,7 @@ Copy the samples, then edit your private copies (these stay gitignored):
 
 | Sample | Copy to | What it holds |
 |---|---|---|
+| `samples/company.example.json` | `personal/company.json` | Your company-specific codes, supplied once: `defaultOffice` (office code) + `selfAccount` / `clientAccount` (the client-meal split GL accounts). The agent asks for these upfront if missing. Not in the repo by design. |
 | `samples/roster.example.json` | `personal/attendees.json` | Your recurring client reps, one key per client (`clientKey`). PII - never commit. |
 | `samples/triage.example.json` | `personal/triage.json` | Your per-user merchant overrides: `personalMerchants` (always excluded) and `businessMerchants` (treated as business travel). Keeps your local merchant names out of the public repo. |
 | `samples/run-config.example.json` | `personal/runs/<run>/run-config.json` | Per-report settings: `clientKey`, `defaultLocation`, `businessPurpose`, `reportDescription`. |
@@ -113,8 +114,9 @@ Copy the samples, then edit your private copies (these stay gitignored):
   don't default it.
 - **Default Location = a CBRE OFFICE code** (e.g. `363 George St-SYD`), not the trip destination.
 - **Client meals** (`Meals & Ent'mnt - Client`) need **attendees** (you + client reps) AND a
-  **50/50 accounting split**: 50% stays on account `529200`, 50% moves to `529300`. Split the AUD
-  amount 50/50.
+  **50/50 accounting split**: 50% stays on your **self** GL account, 50% moves to the **client**
+  account. Split the AUD amount 50/50. (The two GL codes are company-specific — you supply them
+  once in `personal/company.json`; see [personal/ setup](#personal-setup).)
 - **Accommodation** should be booked through **CTM**; out-of-pocket accom needs approval - flag it.
 - **Relocation** = `Employee Relocation` type; needs the authorising contract attached.
 - **Receipts**: itemised receipts are expected (especially meals & entertainment); a card-statement

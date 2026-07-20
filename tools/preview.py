@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cbre_lib import dump_json, load_json  # noqa: E402
+from cbre_lib import dump_json, get_default_office, load_json  # noqa: E402
 
 
 def _clip(s: str, n: int) -> str:
@@ -49,7 +49,8 @@ def render(data: dict) -> str:
     if data.get("tripWindows"):
         out.append("Detected trip windows: " + ", ".join(f"{a}..{b}" for a, b in data["tripWindows"]))
     if rc:
-        out.append(f"Client: {rc.get('clientKey','-')}   Location: {rc.get('defaultLocation','-')}   "
+        office = rc.get("defaultLocation") or get_default_office() or "<office not set — see personal/company.json>"
+        out.append(f"Client: {rc.get('clientKey','-')}   Location: {office}   "
                    f"Purpose: {rc.get('businessPurpose','-')}")
     hdr = f"{'#':<5}{'DATE':<12}{'MERCHANT':<28}{'AMOUNT':>10} {'TYPE':<9}{'ATT':<4}{'SPLIT':<6}{'RCPT':<5}"
 

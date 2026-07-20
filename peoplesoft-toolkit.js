@@ -106,24 +106,26 @@ const PS = (() => {
        Step A: addDistRow(lineIdx, fullAmount) -> POSTBACK, wait 2s
        Step B: setSplit(lineIdx, fullAmount, halfA, halfB) ---- */
     addDistRow(lineIdx, fullAmount){
+      if(!PS.ACCT.employee || !PS.ACCT.client) return 'PS.ACCT not set — put selfAccount/clientAccount from personal/company.json into PS.ACCT first';
       const d=D(); let distN=null;
       for(let n=0;n<60;n++){const a=d.getElementById('EX_SHEET_DIST_ACCOUNT$'+n); if(!a)continue;
-        if(a.value==='529200' && num(d.getElementById('EX_SHEET_DIST_TXN_AMOUNT$'+n)?.value)===num(fullAmount)) distN=n;}
+        if(a.value===PS.ACCT.employee && num(d.getElementById('EX_SHEET_DIST_TXN_AMOUNT$'+n)?.value)===num(fullAmount)) distN=n;}
       if(distN===null) return 'dist not found (is accounting expanded? amount '+fullAmount+'?)';
       const btn=d.getElementById('EX_SHEET_DIST$new$'+distN+'$$'+lineIdx);
       if(!btn) return 'add btn EX_SHEET_DIST$new$'+distN+'$$'+lineIdx+' missing';
       btn.click(); this._splitDistN=distN; return 'added on dist '+distN+' — wait 2s, then setSplit()';
     },
     setSplit(lineIdx, fullAmount, halfA, halfB){
+      if(!PS.ACCT.employee || !PS.ACCT.client) return 'PS.ACCT not set — put selfAccount/clientAccount from personal/company.json into PS.ACCT first';
       const d=D(); const origN=this._splitDistN;
       let newN=null; for(let n=0;n<60;n++){const a=d.getElementById('EX_SHEET_DIST_ACCOUNT$'+n); if(!a)continue;
         const amt=d.getElementById('EX_SHEET_DIST_TXN_AMOUNT$'+n)?.value;
-        if(a.value==='529200' && (amt===''||amt==='0.00') && n>4) newN=n;}
+        if(a.value===PS.ACCT.employee && (amt===''||amt==='0.00') && n>4) newN=n;}
       if(origN==null||newN==null) return 'could not locate rows';
       set(d,'EX_SHEET_DIST_TXN_AMOUNT$'+origN, String(halfA));
       set(d,'EX_SHEET_DIST_TXN_AMOUNT$'+newN,  String(halfB));
-      set(d,'EX_SHEET_DIST_ACCOUNT$'+newN, '529300');
-      return {keep529200:origN+'='+halfA, client529300:newN+'='+halfB};
+      set(d,'EX_SHEET_DIST_ACCOUNT$'+newN, PS.ACCT.client);
+      return {keepSelf:origN+'='+halfA, moveClient:newN+'='+halfB};
     },
 
     /* ---- attendees. open(lineIdx) POSTBACK->modal. Then addAttendeeRows([...]) then attendeeOK().
@@ -157,7 +159,10 @@ const PS = (() => {
 PS.CODES = { Taxi:'TAXIBU', TaxiIntl:'TAXIINT', Relocation:'EMPRELO', MealClient:'MEALCLI',
              Subsistence:'SUBSIST', LightRefreshment:'LIGHTRE', AccomDom:'ACCDOM',
              AccomIntl:'ACCINT', TravelOther:'TRAVOTH' };
-PS.ACCT = { employee:'529200', client:'529300' };           // client meal split
+// Client-meal split GL accounts are COMPANY-SPECIFIC — not shipped here. The agent sets these
+// at runtime from personal/company.json (selfAccount -> employee, clientAccount -> client)
+// before calling addDistRow()/setSplit(). See SKILL Stage 0.
+PS.ACCT = { employee:'', client:'' };
 
 /* Attendee templates are PII (real client names) and are kept OUT of this public file.
    Load them at runtime from personal/attendees.json (gitignored). One key per client; each

@@ -8,7 +8,7 @@ Usage:
     python tools/classify.py lines.json --run-config run.json [--roster personal/attendees.json] [--out classified.json]
 
 run-config.json (example in samples/run-config.example.json):
-    { "clientKey": "AcmeCorp", "defaultLocation": "363 George St-SYD",
+    { "clientKey": "AcmeCorp", "defaultLocation": "<office code, or omit to use company.json>",
       "businessPurpose": "Client-Business Meeting", "reportDescription": "Site visit" }
 """
 from __future__ import annotations

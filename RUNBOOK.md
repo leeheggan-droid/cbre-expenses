@@ -49,12 +49,14 @@ Golden rules of the JS approach:
    `360 Collins St`. Use the lookup; free text like "Bali" fails.
 3. **Client meals** (`Meals & Ent'mnt - Client`) need TWO things:
    - **Attendees** — yourself (CBRE) + the client reps. Save blocks without attendees.
-   - **50/50 accounting split** — duplicate the distribution row; **50% stays account `529200`
-     (CBRE/employee), 50% changes to `529300` (client)**. i.e. "where there's a 2, make it a 3"
-     = the 4th digit `529200 → 529300`. Split the dollar amount 50/50 too.
+   - **50/50 accounting split** — duplicate the distribution row; **50% stays on your **self**
+     account (`<SELF_ACCOUNT>`, CBRE/employee), 50% changes to the **client** account
+     (`<CLIENT_ACCOUNT>`)**. Split the dollar amount 50/50 too. These two GL codes are
+     company-specific and are **not stored in this repo** — put them once in
+     `personal/company.json` (`selfAccount` / `clientAccount`); the agent asks for them upfront.
    - The split is NOT enforced by save (it's policy), but always do it.
 4. **Employee/internal meals**: attendees fine, **no split**.
-5. **Taxis & most single-use expenses**: no attendees, no split — leave the single 529200 line.
+5. **Taxis & most single-use expenses**: no attendees, no split — leave the single self-account line.
 6. **Accommodation** should be booked through **CTM** (CBRE's travel company). Claiming accom
    out-of-pocket "will require approval" (form warns on the line). Flag to approver.
 7. **Relocation** = `Employee Relocation` type. Check your employment contract for the approved
@@ -129,7 +131,7 @@ matching its account+amount, not by assuming M=N.
    date/desc/amount and change Expense Type (fires postback). Re-set merchant after.
 4. **Fix any `<Unspecified>` wallet items** — set their Expense Type.
 5. **Govt Exp = No on all** — Expand All, then set every `CB_..._GOVT_EXP$637$$N` checked.
-6. **Client meals**: add attendees (modal) + 50/50 `529200`/`529300` split (expand accounting,
+6. **Client meals**: add attendees (modal) + 50/50 `<SELF_ACCOUNT>`/`<CLIENT_ACCOUNT>` split (expand accounting,
    add dist row, split amount, change 2nd account).
 7. **Save** (`ER_TOOLBAR#SAVE`). Save prompts attendee modals for any client meal still missing them.
 8. **Verify**: read all lines + total; re-open a couple of attendee modals to confirm they stuck.

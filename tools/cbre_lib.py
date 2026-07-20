@@ -31,8 +31,13 @@ EXPENSE_TYPES = {
 }
 
 # Client-meal 50/50 accounting split (RUNBOOK §1.3) — mirror PS.ACCT.
-ACCT_EMPLOYEE = "529200"
-ACCT_CLIENT = "529300"
+# The GL account codes are COMPANY-SPECIFIC and are deliberately NOT shipped in this repo.
+# The user supplies them once in personal/company.json (see samples/company.example.json); the
+# agent asks for them upfront (SKILL Stage 0). Until set, these placeholders flow through the whole
+# pipeline so the GATE-1 review visibly shows the accounts are still unconfigured.
+# ACCT_EMPLOYEE / ACCT_CLIENT are resolved from that config at the bottom of this module.
+ACCT_SELF_PLACEHOLDER = "<SELF_ACCOUNT>"
+ACCT_CLIENT_PLACEHOLDER = "<CLIENT_ACCOUNT>"
 
 # Meal types that require attendees (RUNBOOK §1.3 + §6: int'l employee meals too).
 MEAL_TYPES_NEED_ATTENDEES = {"MEALCLI", "MEALINC", "MEALINT"}
@@ -214,6 +219,10 @@ def build_proposed(line: Line, has_client_roster: bool, roster: Optional[dict],
         p.isClientMeal = True
         p.split = True
         p.splitAccounts = [ACCT_EMPLOYEE, ACCT_CLIENT]
+        if ACCT_EMPLOYEE == ACCT_SELF_PLACEHOLDER or ACCT_CLIENT == ACCT_CLIENT_PLACEHOLDER:
+            line.flags.append(
+                "GL split accounts not configured — add selfAccount/clientAccount to "
+                "personal/company.json (the agent should ask for these upfront)")
     return p
 
 
@@ -329,3 +338,42 @@ def load_json(path: str) -> dict:
 def dump_json(obj, path: str) -> None:
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(obj, fh, indent=2, ensure_ascii=False)
+
+
+# --------------------------------------------------------------------------- #
+# Company-specific config (gitignored). The user provides these ONCE — the agent
+# asks upfront (SKILL Stage 0) — so no company codes are baked into the public repo.
+#   personal/company.json : {defaultOffice, selfAccount, clientAccount}
+# --------------------------------------------------------------------------- #
+def load_company(path: Optional[str] = None) -> dict:
+    """Load personal/company.json, or {} if it doesn't exist yet.
+
+    Returning {} (rather than raising) is deliberate: callers fall back to placeholders,
+    which makes an unconfigured install obvious at GATE 1 instead of silently wrong.
+    """
+    import os
+    if path is None:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(root, "personal", "company.json")
+    try:
+        return load_json(path)
+    except (OSError, ValueError):
+        return {}
+
+
+def get_accounts(company: Optional[dict] = None) -> tuple:
+    """(selfAccount, clientAccount) from company config, or placeholders if unset."""
+    c = load_company() if company is None else company
+    return (str(c.get("selfAccount") or ACCT_SELF_PLACEHOLDER),
+            str(c.get("clientAccount") or ACCT_CLIENT_PLACEHOLDER))
+
+
+def get_default_office(company: Optional[dict] = None) -> Optional[str]:
+    """The user's CBRE office code for the report's Default Location, or None if unset."""
+    c = load_company() if company is None else company
+    office = c.get("defaultOffice")
+    return office if office and not str(office).startswith("<") else None
+
+
+# Resolve the client-meal split accounts from personal/company.json (or placeholders).
+ACCT_EMPLOYEE, ACCT_CLIENT = get_accounts()

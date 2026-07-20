@@ -76,8 +76,8 @@ flagged so you don't double-enter corporate-card items.
 ```
 `classify.py` reads the normalized lines. It triages each line into business / personal / uncertain
 (using foreign-trip date windows + merchant patterns, with your `personal/triage.json` overrides),
-proposes an expense type, and flags client meals that need attendees + the 50/50 `529200`/`529300`
-split. `--roster` and `--triage` are optional.
+proposes an expense type, and flags client meals that need attendees + the 50/50 self/client GL
+split (the GL codes come from `personal/company.json`). `--roster` and `--triage` are optional.
 
 ```
 # 4. GATE 1 review table + the approved plan

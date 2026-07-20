@@ -31,7 +31,20 @@ PeopleSoft expense report. Read `RUNBOOK.md` for the underlying rules and field 
 ---
 
 ## Stage 0 — Gather inputs
-Ask the user for / locate:
+
+**0a. Company config — ASK UPFRONT, before anything else.** Check `personal/company.json` exists
+and has real values (not `<placeholders>`) for `defaultOffice`, `selfAccount`, `clientAccount`.
+If the file is missing or any value is still a placeholder, **stop and ask the user now** — do not
+guess these and do not proceed without them:
+   - "What's your CBRE **office code** for the report's Default Location? (e.g. `363 George St-SYD`)"
+   - "For client-meal splits, which **GL account** does your **own/employee** half stay on?"
+   - "…and which **GL account** does the **client** half move to?"
+   Write the answers to `personal/company.json` (shape in `samples/company.example.json`). It is
+   gitignored — never commit it. These are company-specific and are **not** stored in the repo, which
+   is why they must be collected once per user. The pipeline reads them automatically; before any
+   client-meal split in Stage 2 also set `PS.ACCT = {employee:<selfAccount>, client:<clientAccount>}`.
+
+Then gather / locate:
 1. **Bank statement** (CSV or PDF) — primary. Put under `personal/runs/<run>/`.
 2. **Receipts** (images/PDFs) — optional secondary. Extract them with **Claude-native vision**: open
    each image with the Read tool and write the data to `personal/runs/<run>/receipts.json` as a list
@@ -123,8 +136,9 @@ reports a missing field, stop and report rather than pushing on.
      the client reps) → `PS.attendeeOK()` → wait. Identify the meal by **merchant**, not modal number
      (modal numbering is off-by-one — RUNBOOK §5).
    - 50/50 split: `PS.expandAccounting(idx)` → wait → `PS.addDistRow(idx, fullAUD)` → wait →
-     `[a,b] = PS.halves(fullAUD); PS.setSplit(idx, fullAUD, a, b)` (keeps 50% on 529200, moves 50% to
-     529300). For foreign lines split the **AUD** distribution amount, not the foreign amount.
+     `[a,b] = PS.halves(fullAUD); PS.setSplit(idx, fullAUD, a, b)` (keeps 50% on your self account,
+     moves 50% to the client account — from `PS.ACCT`, set in Stage 0a). For foreign lines split the
+     **AUD** distribution amount, not the foreign amount.
    - `PS.save()` → wait 3s.
 5. **Audit**: `PS.audit()` — verify line count, each amount/type, and that totals match the approved
    plan. Re-open a couple of attendee modals to confirm they stuck.

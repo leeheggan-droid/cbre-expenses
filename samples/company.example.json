@@ -1,0 +1,6 @@
+{
+  "_comment": "Company / PeopleSoft-specific codes YOU provide once. Copy this to personal/company.json (gitignored, never committed). The agent asks for these UPFRONT (see SKILL Stage 0) if the file is missing or any value is still a <placeholder>. If unsure, copy the codes from one of your previously-approved expense reports or ask your finance team.",
+  "defaultOffice": "<YOUR CBRE OFFICE CODE — used as the report's Default Location, e.g. 363 George St-SYD>",
+  "selfAccount": "<GL ACCOUNT the employee/self half of a client-meal split stays on>",
+  "clientAccount": "<GL ACCOUNT the client half of a client-meal split moves to>"
+}

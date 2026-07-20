@@ -1,7 +1,7 @@
 """
 attendees - the per-meal attendee interview step.
 
-CBRE client meals/drinks must record who attended (and get a 50/50 529200/529300 split). For each
+CBRE client meals/drinks must record who attended (and get a 50/50 self/client GL split). For each
 meal/drink line that needs attendees, the operator answers: how many people, how many CBRE, how many
 client, and their names in "Surname,First" format with each person's organisation.
 

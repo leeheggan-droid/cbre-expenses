@@ -39,7 +39,7 @@
             }
           }
         },
-        "split": { "type": "boolean", "description": "client-meal 50/50 529200/529300 split" },
+        "split": { "type": "boolean", "description": "client-meal 50/50 self/client GL split" },
         "splitAccounts": { "type": "array", "items": { "type": "string" } },
         "foreignCcy": { "type": ["string", "null"] }
       }
