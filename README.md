@@ -15,6 +15,7 @@ which is gitignored and never committed.
 | Path | What it is |
 |---|---|
 | **RUNBOOK.md** | The CBRE rules + step-by-step manual procedure + every PeopleSoft field ID + gotchas. The authority for how the form behaves. |
+| **docs/HK-MODULE.md** | Filing under the **Hong Kong** entity (office `ZZ010`, base HKD, a different 28-type expense chart, the meal-attendee modal, and the BU-36120 permission wall). Companion: `schema/hk_expense_types.json` + `tools/ps_helpers_hk.js`. |
 | **README.md** | This overview. |
 | **docs/USAGE.md** | Step-by-step walk-through of both operator modes. |
 | **peoplesoft-toolkit.js** | Pasteable `PS` JavaScript helpers run against the form (console / `javascript_tool`). |
