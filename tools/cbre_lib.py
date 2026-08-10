@@ -8,6 +8,7 @@ in sync with RUNBOOK.md and peoplesoft-toolkit.js.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
@@ -45,6 +46,88 @@ MEAL_TYPES_NEED_ATTENDEES = {"MEALCLI", "MEALINC", "MEALINT"}
 MEAL_TYPES_NEED_SPLIT = {"MEALCLI", "MEALINC"}
 
 DOMESTIC_CCY = "AUD"
+
+
+# --------------------------------------------------------------------------- #
+# Entity expense-type charts.
+#
+# The codes above are the AUSTRALIAN entity's chart. Filing under the Hong Kong entity
+# (SetID 36000 / BU 36120) uses a completely different 28-type chart — see
+# docs/HK-MODULE.md §2 and schema/hk_expense_types.json. Almost no display string is
+# shared, and the one that is ("Meals & Ent'mnt - Client") is a DIFFERENT code in each
+# chart (MEALCLI vs MEAL50), so a chart must always be chosen deliberately — never
+# guessed from the display text.
+#
+# load_chart() is the single place that resolves a chart, so every tool that maps a
+# sheet's display strings back to codes (excel_read.py today, excel_template.py next)
+# selects it the same way.
+# --------------------------------------------------------------------------- #
+CHART_NAMES = ("au", "hk")
+_SCHEMA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "schema")
+HK_CHART_PATH = os.path.join(_SCHEMA_DIR, "hk_expense_types.json")
+
+
+@dataclass
+class ExpenseChart:
+    """One entity's expense-type chart: codes, display strings and the meal rules."""
+    name: str
+    expense_types: dict                  # {code: display}
+    meal_types_need_attendees: set
+    meal_types_need_split: set
+    base_currency: str = DOMESTIC_CCY
+    office: Optional[str] = None         # default Location code, if the chart pins one
+
+    @property
+    def display_to_code(self) -> dict:
+        """{display: code} — the reverse map the review sheet is read back through."""
+        return {v: k for k, v in self.expense_types.items()}
+
+    def displays(self) -> list:
+        """Display strings in chart order (the review sheet's dropdown source)."""
+        return list(self.expense_types.values())
+
+
+def load_chart(name: str = "au", path: Optional[str] = None) -> ExpenseChart:
+    """Return the ExpenseChart for an entity. "au" (the default) is the built-in chart.
+
+    "hk" is loaded from schema/hk_expense_types.json (override with `path`). An unknown
+    name raises rather than falling back to AU: silently filing HK lines against AU codes
+    is exactly the failure this helper exists to prevent.
+    """
+    key = str(name or "").strip().lower()
+    if key == "au":
+        return ExpenseChart(
+            name="au",
+            expense_types=dict(EXPENSE_TYPES),
+            meal_types_need_attendees=set(MEAL_TYPES_NEED_ATTENDEES),
+            meal_types_need_split=set(MEAL_TYPES_NEED_SPLIT),
+            base_currency=DOMESTIC_CCY,
+        )
+    if key == "hk":
+        data = load_json(path or HK_CHART_PATH)
+        return ExpenseChart(
+            name="hk",
+            expense_types=dict(data.get("expenseTypes") or {}),
+            meal_types_need_attendees=set(data.get("mealTypesNeedAttendees") or []),
+            meal_types_need_split=set(data.get("mealTypesNeedSplit") or []),
+            base_currency=str(data.get("baseCurrency") or DOMESTIC_CCY),
+            office=(data.get("office") or {}).get("code"),
+        )
+    raise ValueError(f"unknown expense chart {name!r} — choose one of {', '.join(CHART_NAMES)}")
+
+
+def add_chart_argument(parser, default: Optional[str] = "au") -> None:
+    """Add the shared `--chart {au,hk}` flag to a tool's argparse parser.
+
+    Pass default=None when the tool can learn the chart from its input (a workbook's
+    Header sheet, say): the flag then reads as "the operator explicitly said so", which
+    is what lets a conflict be detected instead of silently resolved.
+    """
+    parser.add_argument("--chart", choices=list(CHART_NAMES), default=default,
+                        help="entity expense-type chart (hk = Hong Kong, "
+                             "schema/hk_expense_types.json)"
+                             + (f"; default: {default}" if default else
+                                "; default: taken from the sheet, else au"))
 
 
 # --------------------------------------------------------------------------- #

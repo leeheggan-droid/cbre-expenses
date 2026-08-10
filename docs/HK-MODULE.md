@@ -50,6 +50,47 @@ The HK `EXPENSE_TYPE$N` dropdown has **28** options. Full list + codes in
 | Travel – Other / Visa / tourist levy | **OTHTAX** — Other Taxes, Licenses & Fees | `TRVL` exists but is "GWS ONLY", usually invalid for non-GWS staff |
 | Employee Relocation | **EMPRELC** | needs authorising contract attached |
 
+### Reading an HK review sheet back: `--chart hk`
+
+The offline pipeline maps a sheet's **ExpenseType display string** back to its code. That map is
+entity-specific, so `excel_read.py` takes a chart:
+
+```
+# AU (default — unchanged)
+& $PY tools\excel_read.py run\review.xlsx --out run\approved.json
+
+# HK — displays resolved against schema/hk_expense_types.json
+& $PY tools\excel_read.py run\review.xlsx --chart hk --out run\approved.json
+```
+
+**Better: let the sheet say so.** If the workbook has a `Header` sheet with a label/value row
+`Chart | hk` (this is what Waypoint exports, alongside `Entity | HK` and `Business Unit | 36120`),
+`excel_read.py` picks the HK chart on its own and **no flag is needed**. Resolution order is:
+Header sheet → explicit `--chart` → `au`.
+
+- **An HK sheet read under the AU chart is not always caught by the unknown-type check.** The two
+  charts share exactly **two** display strings, and each is a *different code* in each chart:
+  "Meals & Ent'mnt - Client" (AU `MEALCLI` / HK `MEAL50`) and "Employee Relocation" (AU `EMPRELO` /
+  HK `EMPRELC`). Those resolve happily to the **wrong** code — and meals are the most common line in
+  a pack. The other 26 HK displays error out. So: a `Header` `Chart` row, or `--chart hk`, every time.
+- If the sheet declares a chart **and** `--chart` is passed and they **disagree**, the read fails
+  naming both values and writes nothing. Someone is wrong, and guessing which is how a wrong claim
+  gets filed. Agreement is not a conflict. An unrecognised `Chart` value in the sheet also fails
+  rather than falling back to AU.
+- An ExpenseType the chosen chart doesn't know is now a **hard error**: the tool lists the offending
+  rows and values, writes nothing, and exits non-zero. It used to leave the code null and carry on,
+  which put a line into PeopleSoft with **no expense type at all**. `--allow-unknown-types` restores
+  the old lenient behaviour if you ever need it.
+- `--chart hk` also takes `mealTypesNeedAttendees` from the HK chart, so `MEAL50`/`MEAL100` set
+  `needsAttendees` (the AU codes never match an HK sheet).
+- Chart selection lives in `cbre_lib.load_chart()` / `add_chart_argument()`, so `excel_template.py`
+  can take the same flag when it needs to emit an HK dropdown list.
+- The approved plan records which chart produced it and where that came from:
+  `{"chart": "hk", "chartSource": "header", "lines": [...]}` (`header` | `flag` | `default`). The run
+  prints the same thing: *"…using the hk expense chart (declared by the sheet's Header)"*.
+- A workbook with **no** `Header` sheet (or no `Chart` row) behaves exactly as before: AU by default,
+  strict on unknown types.
+
 **Attendee rules under HK:**
 - `MEAL50` (client) and `MEAL100` (employee) both require ≥1 attendee. You are auto-added, so a
   **solo employee meal saves fine with just you** — no extra action needed beyond OK-ing the modal.

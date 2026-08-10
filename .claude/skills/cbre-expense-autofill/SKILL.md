@@ -75,6 +75,11 @@ $PY tools/excel_template.py personal/runs/<run>/classified.json --out personal/r
 # ... operator fills review.xlsx (Claim, ExpenseType, Attendees, Split5050) ...
 $PY tools/excel_read.py     personal/runs/<run>/review.xlsx --out personal/runs/<run>/approved.json
 ```
+Filing under the **HK** entity: add `--chart hk` to `excel_read.py` (HK has a different 28-type chart —
+docs/HK-MODULE.md §2). A sheet that declares `Chart | hk` in a `Header` sheet (e.g. a Waypoint export)
+needs no flag; passing a *different* `--chart` than the sheet declares aborts the read naming both.
+An ExpenseType missing from the chosen chart also aborts, with the offending rows listed. Never file a
+line with no type — and check the run's "using the … expense chart" line matches the entity.
 
 ## GATE 1 — Pre-entry review (REQUIRED)
 Show the user the `preview.py` table. Walk through every **FLAG** (unknown types, accommodation→CTM,

@@ -35,7 +35,7 @@ which is gitignored and never committed.
 | `preview.py` | Render the GATE 1 review table and write the `approved.json` plan. |
 | `cbre_lib.py` | Shared helpers + the CBRE rules (expense-type codes, money/date parsing, triage, the 50/50 split) in one place. |
 | `excel_template.py` | (Easy mode) generate the fill-in Excel template with dropdowns. |
-| `excel_read.py` | (Easy mode) read a filled-in Excel template back into the entry plan. |
+| `excel_read.py` | (Easy mode) read a filled-in Excel template back into the entry plan. `--chart au` (default) or `--chart hk` picks the entity expense-type chart. |
 | `receipt_bundle.py` | Shrink + per-claim-name receipt images for attachment, and verify #receipts == #lines. (The receipts JSON itself is produced by Claude-native vision - no external API key.) |
 | `attendees.py` | The per-meal attendee interview: `list` meals needing attendees, `apply` answers to set attendees + 50/50 split. |
 | `run_pipeline.py` | One-shot: parse -> reconcile -> classify -> preview (GATE 1) into a run dir. |
@@ -52,6 +52,13 @@ table for you to approve. This is the offline pipeline below.
 dropdowns (expense type, business/personal, etc.); you fill it in by hand, and `excel_read.py` reads
 it back to build the same entry plan. Use this when you'd rather eyeball and tick boxes than review a
 generated table.
+
+If you're filing under the **Hong Kong** entity, read the sheet back with
+`excel_read.py … --chart hk` — the HK expense-type chart is a completely different 28 types
+(`schema/hk_expense_types.json`, see **docs/HK-MODULE.md**). A workbook that declares its own chart in
+a `Header` sheet (`Chart | hk`) needs no flag; if it declares one *and* you pass a different `--chart`,
+the read fails naming both rather than picking a winner. An ExpenseType that isn't in the chosen chart
+fails the read with the offending rows listed, rather than quietly filing a line with no type.
 
 Either way, the plan feeds the same Stage 2: the skill drives PeopleSoft and **stops at Summary and
 Submit**.

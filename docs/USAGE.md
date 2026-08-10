@@ -123,10 +123,21 @@ and read it back into the same plan.
 
 # 3. Read it back into the entry plan
 & $PY tools\excel_read.py personal\runs\2026-06-bali\plan.xlsx --out run\approved.json
+#    Filing under the HK entity? Add --chart hk (see docs/HK-MODULE.md 2).
 ```
 
 The resulting `approved.json` is the same contract Stage 2 consumes, so GATE 2 is identical: the skill
 drives PeopleSoft and stops at "Summary and Submit".
+
+`--chart` selects the entity expense-type chart the sheet's ExpenseType text is resolved against:
+`au` (default, unchanged) or `hk` (`schema/hk_expense_types.json`). A value that isn't in the chosen
+chart stops the read, lists the offending rows and exits non-zero — it is never silently dropped.
+
+A workbook may also **declare its own chart**: a `Header` sheet with a label/value row `Chart | hk`
+(Waypoint exports one). Then no flag is needed. Order: Header sheet → `--chart` → `au`. If the sheet
+and the flag disagree the read fails naming both and writes nothing — two of the display strings mean
+different codes in the two charts, so the wrong chart mis-files rather than erroring. The run prints
+which chart it used, and the plan records it as `"chart"` / `"chartSource"`.
 
 ---
 
