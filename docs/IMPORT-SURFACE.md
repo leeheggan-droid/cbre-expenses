@@ -182,3 +182,41 @@ only once explicitly saved.
 
 **`Move to Wallet` DOES persist** — it is a real state change on a real receipt. It is the one
 action in this document that is not free.
+
+---
+
+## 7. The mobile app is OPTIONAL: receipts can be uploaded from the browser
+
+The app is the only route that runs CBRE's OCR, but it is **not** the only route to get a receipt
+image onto a claim. The report's own attachment flow is a plain file upload.
+
+`Attachments` (report header) → `Add Attachment` → a **`File Attachment`** modal containing a
+genuine **`<input type=file name="#ICOrigFileName">`**, with **no `accept` filter** (JPEG, PNG and
+PDF all accepted) and **`multiple=false`** — one file per `Add → Choose → Upload` cycle.
+
+Because it is a real file input, **browser automation can drive it directly**. That makes an
+app-free capture pipeline possible: capture however you like, parse with your own tooling, and
+push the images in here.
+
+**⚠️ This route does NOT run CBRE's receipt OCR.** Parsing happens only in the mobile app. Going
+in this way, the image lands on the claim but merchant/amount/date must come from your own
+extraction. Never promise auto-extraction on this path.
+
+### CBRE's own rules, printed in the modal — these are hard constraints
+
+1. **Filenames must be simple and short: letters, numbers and underscore only.**
+2. Avoid lengthy names and special characters; rename before upload.
+3. **The total size of all files must be less than 10 MB per expense report.**
+4. **Use `Save for Later` after uploading attachments and before attempting to submit.**
+
+> **Rule 3 is the binding constraint, and it is tighter than it looks.** Measured: 39 phone photos
+> totalling ~321 MB of source bundle to **9.33 MB** at the default 1300px/q72 — inside the budget,
+> but at **98%** of it. A couple more receipts and a claim silently exceeds the cap.
+>
+> **Shrinking images one at a time does not satisfy a cap on their total.**
+> `tools/receipt_bundle.py` fits the bundle to a **total** byte budget (default 9.5 MB), re-
+> encoding every image from its *original* source down a quality ladder until the whole set fits,
+> and exiting non-zero if it cannot. It never silently drops a file.
+
+The alternative is one zip for the whole claim — under the cap, but a zip is a single attachment,
+so it forfeits per-line receipts.

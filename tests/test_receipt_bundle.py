@@ -72,6 +72,66 @@ def test_skip_non_receipt_and_verify_mismatch():
         assert "gone.jpg" in report["missing"]
 
 
+def _noisy_image(w, h, seed):
+    """An image that does NOT compress to nothing -- flat colour would defeat the budget test."""
+    import random
+    rnd = random.Random(seed)
+    img = Image.new("RGB", (w, h))
+    img.putdata([(rnd.randrange(256), rnd.randrange(256), rnd.randrange(256))
+                 for _ in range(w * h)])
+    return img
+
+
+def _make_receipts(receipts_dir, n, seed0=0):
+    plan = []
+    for i in range(n):
+        name = f"IMG_{i:03d}.png"
+        _noisy_image(1600, 1200, seed0 + i).save(os.path.join(receipts_dir, name))
+        plan.append({"lineId": f"L{i:03d}", "receiptFile": name, "merchant": f"Merchant {i}"})
+    return plan
+
+
+def test_bundle_fits_total_budget():
+    """CBRE caps ALL attachments at 10MB per expense report -- the bundle must fit."""
+    with tempfile.TemporaryDirectory() as tmp:
+        receipts = os.path.join(tmp, "receipts")
+        out = os.path.join(tmp, "bundle")
+        os.makedirs(receipts)
+        plan = _make_receipts(receipts, 6)
+
+        budget = 120_000  # deliberately tight: individually-shrunk images blow this
+        report = RB.bundle(receipts, plan, out, budget_bytes=budget)
+
+        assert len(report["bundled"]) == 6, "every receipt must still be bundled"
+        assert report["budgetBytes"] == budget
+        total = sum(os.path.getsize(os.path.join(out, f)) for f in os.listdir(out))
+        assert report["totalBytes"] == total, "reported total must match what is on disk"
+        assert total <= budget, f"bundle is {total}B, over the {budget}B budget"
+        assert report["fitsBudget"] is True
+
+
+def test_budget_impossible_fails_loudly():
+    """An unreachable budget must be reported, not silently truncated or ignored."""
+    with tempfile.TemporaryDirectory() as tmp:
+        receipts = os.path.join(tmp, "receipts")
+        out = os.path.join(tmp, "bundle")
+        os.makedirs(receipts)
+        plan = _make_receipts(receipts, 4, seed0=100)
+
+        report = RB.bundle(receipts, plan, out, budget_bytes=500)
+
+        assert report["fitsBudget"] is False
+        assert len(report["bundled"]) == 4, "files are kept -- we report, we do not delete"
+        assert any("budget" in w.lower() for w in report["warnings"]), \
+            "an over-budget bundle must warn loudly"
+
+
+def test_default_budget_is_under_cbre_cap():
+    """Default must leave headroom under CBRE's stated 10MB limit."""
+    assert RB.MAX_TOTAL_BYTES < 10 * 1024 * 1024, "no headroom under the 10MB cap"
+    assert RB.MAX_TOTAL_BYTES >= 9 * 1024 * 1024, "default budget is needlessly small"
+
+
 def _run_standalone():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:
