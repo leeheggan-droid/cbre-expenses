@@ -17,6 +17,7 @@ which is gitignored and never committed.
 | **RUNBOOK.md** | The CBRE rules + step-by-step manual procedure + every PeopleSoft field ID + gotchas. The authority for how the form behaves. |
 | **docs/HK-MODULE.md** | Filing under the **Hong Kong** entity (office `ZZ010`, base HKD, a different 28-type expense chart, the meal-attendee modal, and the BU-36120 permission wall). Companion: `schema/hk_expense_types.json` + `tools/ps_helpers_hk.js`. |
 | **docs/IMPORT-SURFACE.md** | What PeopleSoft will actually accept as input: **there is no CSV/file import of expense data**. The `myReceipts → Move to Wallet → report` path, why **Quick-Fill** is the safe skeleton and **copy-from-existing is a duplicate-claim trap**, and the browser-automation gotchas for these screens. |
+| **docs/PS-DRIVER-NOTES.md** | Read before browser entry: supported adapters, cross-origin frames, row reordering, postback recovery, validation, attendee persistence and verified receipt uploads. |
 | **README.md** | This overview. |
 | **docs/USAGE.md** | Step-by-step walk-through of both operator modes. |
 | **peoplesoft-toolkit.js** | Pasteable `PS` JavaScript helpers run against the form (console / `javascript_tool`). |
@@ -69,11 +70,11 @@ Submit**.
 ## The offline pipeline (hard way)
 
 No PeopleSoft, no network, safe to run anytime. Stages pass JSON conforming to
-`schema/expenses.schema.json`. The skill calls Python by absolute path; the examples below do too.
+`schema/expenses.schema.json`. Discover your local Python interpreter for the examples below.
 
 ```
 # $PY = the interpreter
-$PY = C:\Users\jacks\AppData\Local\Programs\Python\Python313\python.exe
+$PY = (Get-Command python).Source
 
 # 1. Parse the statement into normalized lines
 & $PY tools\parse_statement.py samples\bank-sample.csv --out run\lines.json
@@ -110,7 +111,7 @@ Copy the samples, then edit your private copies (these stay gitignored):
 
 | Sample | Copy to | What it holds |
 |---|---|---|
-| `samples/company.example.json` | `personal/company.json` | Your company-specific codes, supplied once: `defaultOffice` (office code) + `selfAccount` / `clientAccount` (the client-meal split GL accounts). The agent asks for these upfront if missing. Not in the repo by design. |
+| `samples/company.example.json` | `personal/company.json` | Your company-specific codes, supplied once: `defaultOffice` (office code) + `selfAccount` / `clientAccount` (the client-meal split GL accounts). Resolve missing office values once; split GL accounts are needed only when the applicable entity and plan require a split. Not in the repo by design. |
 | `samples/roster.example.json` | `personal/attendees.json` | Your recurring client reps, one key per client (`clientKey`). PII - never commit. |
 | `samples/triage.example.json` | `personal/triage.json` | Your per-user merchant overrides: `personalMerchants` (always excluded) and `businessMerchants` (treated as business travel). Keeps your local merchant names out of the public repo. |
 | `samples/run-config.example.json` | `personal/runs/<run>/run-config.json` | Per-report settings: `clientKey`, `defaultLocation`, `businessPurpose`, `reportDescription`. |

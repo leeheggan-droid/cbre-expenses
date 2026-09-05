@@ -3,6 +3,12 @@
 How to create/fill an expense report in CBRE's PeopleSoft (myhcm.cbre.com) **fast and correctly**.
 Employee ID and entry point: see `personal/my-details.md`.
 
+> Before browser automation, read [measured driver notes](docs/PS-DRIVER-NOTES.md).
+> This runbook's console/toolkit examples assume script mutation is permitted. For CUA
+> or read-only evaluation adapters, use supported locator actions instead. The driver
+> notes also cover row reordering, save validation and verified attachment uploads.
+> Confirm entity-specific accounting rules before applying the AU examples below.
+
 > **Automated tool / pipeline.** Everything below is the manual reference. The faster path is the
 > `cbre-expense-autofill` skill (`.claude/skills/cbre-expense-autofill/SKILL.md`), which runs an
 > offline Python pipeline and then drives this form for you - using exactly the rules and field IDs in

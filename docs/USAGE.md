@@ -101,11 +101,16 @@ L005 07/06/2026  GRAB *RIDE JAKARTA           85,000.00 TAXIINT  -   -     -
 ```
 
 ### Stage 2 - drive PeopleSoft (GATE 2)
-Hand the approved plan to the `cbre-expense-autofill` skill. It injects `peoplesoft-toolkit.js`,
-pulls My-Wallet items, adds out-of-pocket lines, sets Govt Exp = No on all, adds attendees + the
-50/50 split on client meals, and saves after each line. It then **stops at "Summary and Submit"**:
-you attach receipts and submit. See `SKILL.md` for the entry procedure and `RUNBOOK.md` for the rules
-and field IDs.
+Hand the approved plan to the `cbre-expense-autofill` skill. Read
+[measured driver notes](PS-DRIVER-NOTES.md) before entry. The assistant uses the available
+supported browser adapter, reconciles wallet items, adds out-of-pocket lines, verifies
+classification flags, fills attendees and applies only the entity-specific splits in the
+approved plan. It saves and reads back each change, then uploads receipts when supported.
+
+The assistant stops with a saved draft for your final review and submission. See
+`.claude/skills/cbre-expense-autofill/SKILL.md` for the procedure and `RUNBOOK.md` for the
+manual field reference. A successful save alone does not establish that validation errors,
+attendee gaps or receipt gaps are resolved.
 
 ---
 
@@ -141,11 +146,17 @@ which chart it used, and the plan records it as `"chart"` / `"chartSource"`.
 
 ---
 
-## Receipts (manual attach)
-The Chrome extension is authorised on `myhcm` but **not** `myfin` (where the receipt file-input lives,
-in nested iframes), so the tool cannot upload receipts for you. Prepare the receipt bundle
-(`parse_receipts.py`: shrink image-PDFs, one image per claim, named to the claim), then download +
-attach manually. Verify `#receipts == #lines` before you submit.
+## Receipts
+Receipt upload is supported when the browser integration has access to the form and its
+file chooser. Follow [the verified upload sequence](PS-DRIVER-NOTES.md#uploads-work-through-the-supported-file-chooser).
+Use `tools/receipt_bundle.py` to prepare and size source files; an indexed combined PDF is
+also suitable when every claimed line maps to evidence. A shared folio may cover several
+payments, so count covered lines rather than requiring one physical file per line.
+
+The measured HK limit is less than 10 MB **in total per report**, not per file. Verify the
+current form's tips, keep filenames simple, save after upload and reopen Attachments to
+confirm persistence. If the integration cannot upload, the assistant should prepare the
+pack and hand off that specific action. Final submission remains yours.
 
 ## Tests
 ```

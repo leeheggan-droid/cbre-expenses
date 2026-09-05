@@ -3,7 +3,7 @@ name: cbre-expense-autofill
 description: >
   Auto-fill a CBRE PeopleSoft expense report from a bank statement (+ optional receipts and an
   attendee roster). Parses and classifies offline, shows a review table to approve (GATE 1), then
-  drives the live PeopleSoft form via the Claude-in-Chrome browser extension and STOPS at
+  drives the live PeopleSoft form through the available supported browser integration and STOPS at
   Summary-and-Submit (GATE 2) for the user to submit. Use when the user wants to enter / create /
   fill a CBRE expense report, or mentions PeopleSoft expenses, myhcm, "My Wallet", or an expense run.
 ---
@@ -12,45 +12,50 @@ description: >
 
 End-to-end orchestrator that turns a bank statement into a populated (but **not submitted**) CBRE
 PeopleSoft expense report. Read `RUNBOOK.md` for the underlying rules and field IDs, and
-`peoplesoft-toolkit.js` for the `PS` browser helpers this skill drives.
+`docs/PS-DRIVER-NOTES.md` for measured browser behaviour and adapter selection.
+The `PS` helpers in `peoplesoft-toolkit.js` are for environments that permit script mutations;
+use supported UI locators instead when browser evaluation is read-only.
 
 ## Hard rules (never break)
 - **Never click "Summary and Submit" / never submit.** Stop at GATE 2 and hand control to the user.
 - **Two approval gates.** Do not enter anything into PeopleSoft until the user approves GATE 1.
 - **Bank statement is the source of truth.** Receipts and My-Wallet only corroborate. Never claim a
   receipt that has no matching bank line.
-- **Govt Exp = No on every line** (CBRE rule). Default Location = a CBRE **office** code.
+- Verify Government Expense and billing classifications against the approved plan and applicable
+  entity rules. For non-government expenses, explicitly verify No on every line after saving.
+  Default Location = the employee's CBRE **office** code.
 - **Save after every line / meal** — the session times out in ~15 min and loses unsaved lines.
 - PII (client attendee names) lives only in gitignored `personal/`. Never write it to tracked files.
 
 ## Paths
-- Repo root: the `cbre-expenses` working copy (e.g. `C:\Users\jacks\cbre-expenses`).
-- Python: `C:\Users\jacks\AppData\Local\Programs\Python\Python313\python.exe` (call it `$PY`).
+- Repo root: the local `cbre-expenses` working copy.
+- Python: discover the local Python interpreter and use its path (called `$PY` below).
 - Roster (PII, gitignored): `personal/attendees.json`. Run working dir: `personal/runs/<run>/`.
 
 ---
 
 ## Stage 0 — Gather inputs
 
-**0a. Company config — ASK UPFRONT, before anything else.** Check `personal/company.json` exists
-and has real values (not `<placeholders>`) for `defaultOffice`, `selfAccount`, `clientAccount`.
-If the file is missing or any value is still a placeholder, **stop and ask the user now** — do not
-guess these and do not proceed without them:
-   - "What's your CBRE **office code** for the report's Default Location? (e.g. `363 George St-SYD`)"
-   - "For client-meal splits, which **GL account** does your **own/employee** half stay on?"
-   - "…and which **GL account** does the **client** half move to?"
-   Write the answers to `personal/company.json` (shape in `samples/company.example.json`). It is
-   gitignored — never commit it. These are company-specific and are **not** stored in the repo, which
-   is why they must be collected once per user. The pipeline reads them automatically; before any
-   client-meal split in Stage 2 also set `PS.ACCT = {employee:<selfAccount>, client:<clientAccount>}`.
+**0a. Resolve the entity and required company configuration.** Read the approved plan, workbook
+header and `personal/company.json` if present. Confirm the employee's office and expense chart
+against the live form. Reuse values already supplied or verified in this session; ask only for
+missing information needed for the current action.
+
+Collect `defaultOffice`. Collect `selfAccount` and `clientAccount` only when the applicable entity
+rules and approved plan require an accounting split. Do not block an HK attendees-only plan on
+unused AU split accounts, or infer a 50/50 split from the `MEAL50` code alone. See
+`docs/HK-MODULE.md`; previous no-split runs do not establish a universal HK policy. Save per-user
+configuration under gitignored `personal/` (shape in `samples/company.example.json`). When a
+split is required, resolve its accounts before that step; the toolkit adapter uses
+`PS.ACCT = {employee:<selfAccount>, client:<clientAccount>}`.
 
 Then gather / locate:
 1. **Bank statement** (CSV or PDF) — primary. Put under `personal/runs/<run>/`.
 2. **Receipts** (images/PDFs) — optional secondary. Extract them with **Claude-native vision**: open
    each image with the Read tool and write the data to `personal/runs/<run>/receipts.json` as a list
    under a `receipts` key — `[{file, merchant, date "DD/MM/YYYY", currency, total, type, items[], pay, note}]`
-   (type ∈ meal/drinks/taxi/hotel/…). No external API key. receipts not on the statement are still
-   claimed (reconcile promotes them to lines).
+   (type ∈ meal/drinks/taxi/hotel/…). No external API key. A receipt without a matching bank
+   line is a review candidate; do not automatically promote it into a claim.
 3. **Roster** `personal/attendees.json` and a **run-config** (`clientKey`, `defaultLocation`,
    `businessPurpose`, `reportDescription`). Copy `samples/run-config.example.json`. Per-user recurring
    merchants go in `personal/triage.json` (copy `samples/triage.example.json`).
@@ -93,19 +98,35 @@ person's org. Then apply:
 $PY tools/attendees.py list  personal/runs/<run>/classified.json
 $PY tools/attendees.py apply personal/runs/<run>/classified.json --answers answers.json --out personal/runs/<run>/approved.json
 ```
-Anyone whose org ≠ CBRE makes it a client meal → attendees + 50/50 split set automatically.
+Non-CBRE attendees require review as a client meal. The offline helper can propose an AU
+50/50 split; verify the entity and approved plan before applying it to the live report.
 
-**Get explicit approval before Stage 2.** The approved `lines[]` (each with `proposed`) is what you enter.
+**Get approval before Stage 2.** An explicit instruction to enter an already prepared/approved
+plan supplies that authorization; do not ask again for unchanged scope. Resolve outstanding
+uncertainties without re-requesting approval for confirmed lines. The approved `lines[]`
+(each with `proposed`) is what you enter.
 
 ---
 
-## Stage 2 — Drive PeopleSoft (Claude-in-Chrome)
+## Stage 2 — Drive PeopleSoft
 
-### Setup
+### Select the adapter
+Read `docs/PS-DRIVER-NOTES.md` first. With CUA or an integration that restricts evaluation to
+read-only use, drive inputs through its documented locator methods and cross-origin
+`frameLocator`. Do not inject the toolkit or call page mutation functions through evaluate.
+Use the measured entry/save/modal/upload procedure in that document. Inspect supported APIs;
+do not assume all ordinary Playwright methods exist. Reuse existing authenticated SSO when
+available; hand off login/MFA only when user interaction is actually needed.
+
+The setup and `PS.*` examples below are the **legacy toolkit adapter**, for integrations that
+permit script mutations. They are not required for the locator workflow.
+
+### Legacy toolkit setup
 1. Load browser tools in ONE call:
    `ToolSearch select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__tabs_create_mcp`
 2. `tabs_context_mcp` to find the tab on **myhcm.cbre.com** at the **Create/Modify Expense Report** page.
-   If absent, ask the user to log in (SSO) and open that page — do NOT try to log in for them.
+   If absent, open the known expense entry page and reuse an authenticated session when available.
+   Ask the user to complete sign-in/MFA only if required; never request credentials in chat.
 3. **Inject the toolkit:** read `peoplesoft-toolkit.js` and run its full contents via `javascript_tool`.
    It sets `window.PS`. Verify with `PS.audit()`.
 4. **Inject attendee templates** from `personal/attendees.json`:
@@ -120,7 +141,13 @@ Anything that re-renders the page needs a wait before the next action. After cal
 PS.openAttendees, PS.addAttendeeRow, PS.attendeeOK, PS.openWallet, PS.walletDone, PS.save`
 **wait ~2s** (3s for wallet/save) before the next `javascript_tool` call. Plain setters
 (date/desc/merchant/amount/account) are instant. Each `PS.*` returns a status string — read it; if it
-reports a missing field, stop and report rather than pushing on.
+reports a missing field, inspect the current UI before continuing.
+
+Those delays are historical starting points, not proof a postback completed. Verify the expected
+row/modal/result before the next mutation. A click after save may silently no-op, and a timeout
+may have already applied the write. Read back before retrying. Use small batches for repeated
+postback actions. After insert/reload, rediscover row indices from date, amount, currency,
+merchant and type; never reuse a previous UI suffix as a stable source identifier.
 
 ### Entry procedure (per approved plan)
 1. **My Wallet first** (corporate-card items carry FX conversion): `PS.openWallet()` → wait →
@@ -134,30 +161,46 @@ reports a missing field, stop and report rather than pushing on.
    - **Foreign line** (`proposed.foreignCcy`): `PS.setCurrency(idx, foreignCcy)` → wait 2s →
      re-apply merchant. (Set currency AFTER the type postback or it resets to AUD — RUNBOOK §6.)
    - **`PS.save()` → wait 3s** (every line).
-3. **Govt Exp = No on all**: Expand All, then `PS.govtNoAll()`; check the returned counts.
+3. **Government Expense**: for approved non-government lines, Expand All and use the adapter
+   to set No (toolkit: `PS.govtNoAll()`); verify checked values, not only helper counts.
 4. **Client meals** (`proposed.split` / `needsAttendees`):
    - Attendees: `PS.openAttendees(idx)` → wait → add rows to the needed count (`PS.addAttendeeRow()`
      each → wait), then `PS.fillAttendeeBlanks(proposed.attendees)` (include the CBRE employee +
      the client reps) → `PS.attendeeOK()` → wait. Identify the meal by **merchant**, not modal number
      (modal numbering is off-by-one — RUNBOOK §5).
-   - 50/50 split: `PS.expandAccounting(idx)` → wait → `PS.addDistRow(idx, fullAUD)` → wait →
+   - Only if the entity and approved plan require a 50/50 split: `PS.expandAccounting(idx)` → wait → `PS.addDistRow(idx, fullAUD)` → wait →
      `[a,b] = PS.halves(fullAUD); PS.setSplit(idx, fullAUD, a, b)` (keeps 50% on your self account,
-     moves 50% to the client account — from `PS.ACCT`, set in Stage 0a). For foreign lines split the
-     **AUD** distribution amount, not the foreign amount.
+     moves 50% to the client account — from `PS.ACCT`, set in Stage 0a). The toolkit example uses AU
+     **AUD** distribution amounts. For another entity, verify its base currency and supported
+     accounting workflow before using these AU-oriented helpers.
    - `PS.save()` → wait 3s.
 5. **Audit**: `PS.audit()` — verify line count, each amount/type, and that totals match the approved
-   plan. Re-open a couple of attendee modals to confirm they stuck.
+   plan. Re-open changed attendee modals to confirm they stuck. Inspect every `ERROR_ICON$n`;
+   a draft can save with validation errors. For lodging, verify `NBR_NIGHTS$n` from the folio;
+   do not invent nights to bypass validation. Reconcile source totals per currency and verify
+   report receipt coverage after upload/save.
+
+## Receipts — complete before handover
+Use the supported upload API when available. Missing permission in a previous browser session
+is not a permanent limitation of PeopleSoft. `docs/PS-DRIVER-NOTES.md` documents the verified
+header Attachments → Add Attachment → file chooser → Upload → OK → Save for Later route.
+Read current upload limits: the measured HK form requires **less than 10 MB total per report**,
+short filenames using letters/numbers/underscores, and a save after attaching.
+
+A combined indexed PDF is valid when each claim maps to the relevant evidence; a shared folio
+may support several reconciled payments. File count need not equal line count. The existing
+`tools/receipt_bundle.py` uses per-line file checks, so verify coverage separately for shared
+folios or indexed packs. Preserve original receipt content and references. Flag uncertain
+matches and record the employee's resolution; do not silently treat equal amounts as proof.
+Verify the uploaded filename/size, save, then reopen Attachments to confirm persistence.
+If the integration genuinely cannot upload, explain that specific limitation and hand off only
+that remaining action, with a prepared pack and index.
 
 ## GATE 2 — Final review (REQUIRED, STOP HERE)
-Summarise what was entered (lines, per-currency totals, attendees, splits, Govt Exp all-No) vs the
-approved plan. **Do not submit.** Tell the user to attach receipts (below) and click **Summary and
-Submit** themselves.
-
-## Receipts (manual — extension not authorised on myfin.cbre.com)
-The Chrome extension is authorised on `myhcm` but **not** `myfin` (where the receipt file-input lives,
-in nested iframes). So: prepare the receipt **bundle** (`tools/receipt_bundle.py`: shrink image-PDFs,
-one image per claim, named to the claim), then instruct the user to download + attach manually. Verify
-**#receipts == #lines** before the user submits.
+Summarise saved report status, line count, per-currency source totals, reimbursement total,
+attendee/split completion, government flags, validation errors, receipt coverage and unresolved
+decisions. Update the private run state with the current mapping to prevent duplicate entry.
+**Do not submit.** Leave final review and Summary and Submit to the employee.
 
 ## Troubleshooting
 - `PS` undefined on the next call → re-inject the toolkit (window.PS was lost / page navigated).
