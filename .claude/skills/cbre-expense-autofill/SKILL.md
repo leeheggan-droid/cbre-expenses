@@ -197,7 +197,17 @@ If the integration genuinely cannot upload, explain that specific limitation and
 that remaining action, with a prepared pack and index.
 
 ## GATE 2 — Final review (REQUIRED, STOP HERE)
-Summarise saved report status, line count, per-currency source totals, reimbursement total,
+**Run the auditor checks on the LIVE report first.** Dump every saved line from the form (line
+number, date, type, amount, currency, merchant, description; add `attendees` and `evidence` per
+line from the run's evidence index, and `folio_fb` on every lodging line) to
+`personal/runs/<run>/report_dump.json`, then:
+```
+$PY tools/presubmit_checks.py personal/runs/<run>/report_dump.json
+```
+A non-zero exit means an auditor has already rejected that shape once (`docs/LESSONS.md`); fix the
+line in PeopleSoft, save, re-dump, re-run. Never hand a failing report to the employee.
+
+Then summarise saved report status, line count, per-currency source totals, reimbursement total,
 attendee/split completion, government flags, validation errors, receipt coverage and unresolved
 decisions. Update the private run state with the current mapping to prevent duplicate entry.
 **Do not submit.** Leave final review and Summary and Submit to the employee.
