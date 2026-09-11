@@ -48,8 +48,9 @@ chase to the hotel for an invoice that could have been requested at checkout.
   chooser, a localhost fetch is blocked by the private-network permission prompt, and opening
   the component host top-level lands on a raw sign-in page. Re-entering the portal URL in the
   same tab can trip the access-policy gate ("evaluation already in progress" then a logout).
-  **Do all line edits first, save, and treat the receipt upload as the employee's two clicks**
-  unless the integration exposes a real file-chooser API.
+  **Do all line edits first and save.** Then, on a FRESH portal load (the injected script reaches
+  the cross-origin frames until a call hangs), upload with the clipboard route below: it worked
+  end to end and the attachment persisted after Save for Later.
 - **Clipboard paste moves bytes into a page without passing them through the model.** Put the
   base64 on the OS clipboard, focus a scratch textarea inside the target frame and send a real
   Ctrl+V; 460 KB arrived intact. Useful whenever a same-origin file input is reachable.
