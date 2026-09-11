@@ -40,6 +40,19 @@ chase to the hotel for an invoice that could have been requested at checkout.
 - **The modal iframe lives in the TOP document**, not inside the target-content frame. Look in
   both, take the last visible `ptModFrame_*`.
 - **Save regularly** - the component times out at roughly fifteen minutes.
+- **The attachment dialog is cross-origin.** The portal page is on one host and the expense
+  component, its attendee dialogs and the File Attachment dialog are served from another. The
+  page script can reach the form only while the tool's execution context sits inside that
+  frame; after a hung call the context re-binds to the top page and every frame reads as
+  `contentDocument === null`. A synthesized click on the file input does not open the native
+  chooser, a localhost fetch is blocked by the private-network permission prompt, and opening
+  the component host top-level lands on a raw sign-in page. Re-entering the portal URL in the
+  same tab can trip the access-policy gate ("evaluation already in progress" then a logout).
+  **Do all line edits first, save, and treat the receipt upload as the employee's two clicks**
+  unless the integration exposes a real file-chooser API.
+- **Clipboard paste moves bytes into a page without passing them through the model.** Put the
+  base64 on the OS clipboard, focus a scratch textarea inside the target frame and send a real
+  Ctrl+V; 460 KB arrived intact. Useful whenever a same-origin file input is reachable.
 
 ## Evidence rules that survive every entity
 
