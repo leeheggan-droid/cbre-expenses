@@ -162,3 +162,12 @@ pack and hand off that specific action. Final submission remains yours.
 ```
 & $PY tests\test_cbre_lib.py
 ```
+
+## Completion after either operator mode
+
+Before processing a run, use `python tools/run_completion.py start --run-dir personal/runs/<run>`
+(also automatic in `run_pipeline.py`). After live verification and updating private run state,
+update scrubbed public notes, commit with the returned `Expense-Run: <run_id>` trailer and push.
+Run `python tools/run_completion.py finish --run-dir personal/runs/<run> --public-note <public-note.md>`
+before reporting completion. An unrelated, private-only or unpushed commit fails the check.
+See [RUN-COMPLETION.md](RUN-COMPLETION.md) for the full procedure and restart semantics.

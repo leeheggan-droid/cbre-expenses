@@ -142,6 +142,9 @@ matching its account+amount, not by assuming M=N.
 7. **Save** (`ER_TOOLBAR#SAVE`). Save prompts attendee modals for any client meal still missing them.
 8. **Verify**: read all lines + total; re-open a couple of attendee modals to confirm they stuck.
 9. **Attach receipts**, then **you** click **Summary and Submit** (never auto-submit).
+10. Before reporting the run done, update scrubbed public reusable notes, commit with this run's
+    `Expense-Run` trailer, push and pass `tools/run_completion.py finish`. Start must have captured
+    the run's anchor before the work. See [the completion procedure](docs/RUN-COMPLETION.md).
 
 ---
 

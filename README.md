@@ -42,6 +42,7 @@ which is gitignored and never committed.
 | `receipt_bundle.py` | Shrink + per-claim-name receipt images for attachment, and verify #receipts == #lines. (The receipts JSON itself is produced by Claude-native vision - no external API key.) |
 | `attendees.py` | The per-meal attendee interview: `list` meals needing attendees, `apply` answers to set attendees + 50/50 split. |
 | `run_pipeline.py` | One-shot: parse -> reconcile -> classify -> preview (GATE 1) into a run dir. |
+| `run_completion.py` | Anchor a run; block completion until its tagged public note commit is pushed. See `docs/RUN-COMPLETION.md`. |
 
 ---
 

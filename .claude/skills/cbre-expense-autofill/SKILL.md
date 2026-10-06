@@ -36,6 +36,10 @@ use supported UI locators instead when browser evaluation is read-only.
 
 ## Stage 0 — Gather inputs
 
+Before any run work, anchor it with `$PY tools/run_completion.py start --run-dir personal/runs/<run>`.
+Keep the returned `run_id`; repeated starts resume its original anchor. Use `--new` only for a
+new run in a previously completed directory. The one-shot pipeline also anchors its run.
+
 **0a. Resolve the entity and required company configuration.** Read the approved plan, workbook
 header and `personal/company.json` if present. Confirm the employee's office and expense chart
 against the live form. Reuse values already supplied or verified in this session; ask only for
@@ -211,6 +215,25 @@ Then summarise saved report status, line count, per-currency source totals, reim
 attendee/split completion, government flags, validation errors, receipt coverage and unresolved
 decisions. Update the private run state with the current mapping to prevent duplicate entry.
 **Do not submit.** Leave final review and Summary and Submit to the employee.
+
+## Completion guard — required before reporting done
+
+After the live report checks and private state update, record a reusable lesson or verified
+workflow result in public Markdown under `docs/`, `README.md` or `RUNBOOK.md`. Scrub names,
+claim/report IDs, financial amounts, statements, receipts and credentials. Even a run with no
+new bug needs a short, useful verification note; private run state alone does not count.
+
+Commit the public note with the exact trailer `Expense-Run: <run_id>` from the start command,
+then push the current branch to `origin`. Before a completion/handover message, run:
+
+```
+$PY tools/run_completion.py finish --run-dir personal/runs/<run> --public-note docs/run-lessons.md
+```
+
+Use the actual public note path. Only exit zero with `completion: verified` satisfies this
+check. On failure, report the run as incomplete and resolve the stated repository blocker.
+The ignored `.expense-run-completion.json` receipt names the verified pushed commit. This
+check proves housekeeping; live financial verification and the user's submission gate still apply.
 
 ## Troubleshooting
 - `PS` undefined on the next call → re-inject the toolkit (window.PS was lost / page navigated).
