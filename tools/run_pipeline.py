@@ -20,6 +20,8 @@ import parse_statement as ps  # noqa: E402
 import reconcile as rec  # noqa: E402
 import classify as clf  # noqa: E402
 import preview as pv  # noqa: E402
+from pathlib import Path
+from run_completion import start_guard, GuardError  # noqa: E402
 
 
 def main() -> None:
@@ -35,6 +37,11 @@ def main() -> None:
     ap.add_argument("--outdir", required=True)
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
+    try:
+        run = start_guard(Path(__file__).resolve().parents[1], Path(args.outdir))
+    except GuardError as error:
+        raise SystemExit(f"Run start blocked: {error}") from error
+    print(f"Expense run {run['run_id']} anchored; public-note completion check is pending.")
     j = lambda name: os.path.join(args.outdir, name)  # noqa: E731
 
     # 1. parse
@@ -81,6 +88,7 @@ def main() -> None:
     dump_json(out, j("approved.json"))
     print(f"\nWrote lines/reconciled/classified/approved.json to {args.outdir}")
     print("Next: run the attendee interview for flagged meals, then drive PeopleSoft via the skill (GATE 2).")
+    print("This is GATE 1, not a completed expense run. Finish with tools/run_completion.py after updating and pushing the public notes.")
 
 
 if __name__ == "__main__":
