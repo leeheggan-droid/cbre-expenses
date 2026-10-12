@@ -55,6 +55,12 @@ chase to the hotel for an invoice that could have been requested at checkout.
   base64 on the OS clipboard, focus a scratch textarea inside the target frame and send a real
   Ctrl+V; 460 KB arrived intact. Useful whenever a same-origin file input is reachable.
 
+- **Body-only mailbox search is not attachment search.** Forwarded corporate mail may have an
+  empty wrapper body while the actual itinerary, approval chain, report export, or folio is a
+  nested `.eml`/PDF attachment. Inspect the message's full MIME tree, preserve the original
+  attachment filename and message ID, and search extracted nested-message text before concluding
+  that approval evidence is absent.
+
 ## Evidence rules that survive every entity
 
 - Ride-hailing and hotel lines: the emailed e-receipt or folio, always. Photos are for meals
